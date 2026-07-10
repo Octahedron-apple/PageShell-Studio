@@ -4,11 +4,9 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    // Exclude onnxruntime-web from Vite's pre-bundler so it stays in node_modules.
-    // When pre-bundled, import.meta.url inside onnxruntime-web resolves to .vite/deps/,
-    // causing new URL('ort-wasm-simd-threaded.jsep.mjs', import.meta.url) to point nowhere.
-    // Excluded → served directly from /node_modules/onnxruntime-web/dist/ → URLs resolve correctly.
-    exclude: ['onnxruntime-web'],
+    // Exclude onnxruntime-web, pyodide, and quickjs-emscripten from Vite's pre-bundler so they stay in node_modules.
+    // This allows relative WASM/asset resolving via import.meta.url to work.
+    exclude: ['onnxruntime-web', 'pyodide', 'quickjs-emscripten'],
   },
   server: {
     headers: {
