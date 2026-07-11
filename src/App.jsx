@@ -69,9 +69,75 @@ except Exception as e:
     }
   };
 
+  // Generate default HTML/CSS/JS files if they don't exist
+  const initializeDefaultWebFiles = async () => {
+    try {
+      try {
+        await fileSystemAPI.readFile('workspace/index.html');
+      } catch (e) {
+        // Doesn't exist, create defaults
+        const encoder = new TextEncoder();
+        await fileSystemAPI.writeFile('workspace/index.html', encoder.encode(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PageShell Studio</title>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to PageShell Studio</h1>
+        <p>Your live, offline web development environment.</p>
+        <button id="clickMe">Click Me</button>
+    </div>
+</body>
+</html>`));
+        
+        await fileSystemAPI.writeFile('workspace/styles.css', encoder.encode(`body {
+    background-color: #f0f4f8;
+    color: #333;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+}
+.container {
+    background: white;
+    padding: 2rem 3rem;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    text-align: center;
+}
+h1 {
+    color: #4facfe;
+    margin-top: 0;
+}
+button {
+    background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    margin-top: 1rem;
+}`));
+        
+        await fileSystemAPI.writeFile('workspace/script.js', encoder.encode(`document.getElementById('clickMe').addEventListener('click', () => {
+    alert('Hello from PageShell Studio!');
+});`));
+        
+        refreshFiles();
+      }
+    } catch (err) {
+      console.error("Failed to initialize default web files:", err);
+    }
+  };
+
   useEffect(() => {
-    // 1. Initial file load
-    refreshFiles();
+    // 1. Initial file load and web file generation
+    refreshFiles().then(initializeDefaultWebFiles);
 
     // 2. Subscribe Pyodide worker logs to the UI terminal
     subscribePythonLogs((log) => {
