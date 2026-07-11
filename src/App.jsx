@@ -190,7 +190,7 @@ preview_excel()
     // 2. Assemble prompt template
     const systemPrompt = `You are an offline coding assistant. Here is the relevant file context:\n${contextText}`;
 
-    // 3. Map dialogue history to Qwen messages structure
+    // 3. Map dialogue history to SmolLM2 messages structure
     const historyMessages = aiLogs
       .filter(log => log.sender === 'user' || log.sender === 'ai')
       .map(log => ({
@@ -283,7 +283,7 @@ preview_excel()
             selectedFiles={selectedFiles}
             onQuery={handleQuery}
             aiLogs={aiLogs}
-            onClearLogs={() => setLogs([])}
+            onClearLogs={() => setAiLogs([])}
             statusMessage={statusMessage}
           />
         </section>

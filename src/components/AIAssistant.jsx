@@ -51,7 +51,7 @@ export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLog
       <div style={styles.chatArea} id="ai-chat-body">
         {aiLogs.length === 0 ? (
           <div style={styles.introCard}>
-            <h4 style={styles.introTitle}>Qwen2.5 Coder 0.5B</h4>
+            <h4 style={styles.introTitle}>SmolLM2 135M Instruct</h4>
             <p style={styles.introText}>
               Your code inspector runs 100% offline inside a background WebGPU worker. Check files in the sidebar to attach them as context.
             </p>
