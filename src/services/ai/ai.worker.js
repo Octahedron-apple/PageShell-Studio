@@ -4,7 +4,7 @@ import { env, pipeline, TextStreamer } from '@huggingface/transformers';
 env.allowLocalModels = true;
 env.allowRemoteModels = false;
 env.useBrowserCache = false;
-env.localModelPath = '/vendor/models/';
+env.localModelPath = import.meta.env.BASE_URL + 'vendor/models/';
 
 // Disable nested proxy workers — we are already running inside a Web Worker
 env.backends.onnx.wasm.proxy = false;
@@ -13,10 +13,8 @@ env.backends.onnx.wasm.proxy = false;
 // spawning further nested workers (which Vite's dev server intercepts and breaks)
 env.backends.onnx.wasm.numThreads = 1;
 
-// Point WASM binary fetches at the local node_modules path served by Vite.
-// When onnxruntime-web is excluded from Vite's optimizeDeps, it's served directly
-// from /node_modules/onnxruntime-web/dist/ — same origin, no COEP issues.
-env.backends.onnx.wasm.wasmPaths = '/node_modules/onnxruntime-web/dist/';
+// Point WASM binary fetches at the local vendor folder.
+env.backends.onnx.wasm.wasmPaths = import.meta.env.BASE_URL + 'vendor/onnx/';
 
 let tgPipeline = null;
 

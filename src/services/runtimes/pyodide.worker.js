@@ -39,19 +39,20 @@ function getPyodide() {
         pyodide.FS.chdir('/workspace');
 
         // Load local packaging and micropip for 100% offline installs
-        await pyodide.loadPackage('/vendor/pyodide/packaging-23.2-py3-none-any.whl');
-        await pyodide.loadPackage('/vendor/pyodide/micropip-0.6.0-py3-none-any.whl');
+        const base = import.meta.env.BASE_URL;
+        await pyodide.loadPackage(`${base}vendor/pyodide/packaging-23.2-py3-none-any.whl`);
+        await pyodide.loadPackage(`${base}vendor/pyodide/micropip-0.6.0-py3-none-any.whl`);
 
         const micropip = pyodide.pyimport('micropip');
         await micropip.install([
-          '/vendor/pyodide/numpy-1.26.4-cp312-cp312-pyodide_2024_0_wasm32.whl',
-          '/vendor/pyodide/six-1.16.0-py2.py3-none-any.whl',
-          '/vendor/pyodide/python_dateutil-2.9.0.post0-py2.py3-none-any.whl',
-          '/vendor/pyodide/pytz-2024.1-py2.py3-none-any.whl',
-          '/vendor/pyodide/pandas-2.2.0-cp312-cp312-pyodide_2024_0_wasm32.whl',
-          '/vendor/pyodide/et_xmlfile-1.1.0-py3-none-any.whl',
-          '/vendor/pyodide/openpyxl-3.1.5-py2.py3-none-any.whl',
-          '/vendor/pyodide/xlrd-2.0.1-py2.py3-none-any.whl'
+          `${base}vendor/pyodide/numpy-1.26.4-cp312-cp312-pyodide_2024_0_wasm32.whl`,
+          `${base}vendor/pyodide/six-1.16.0-py2.py3-none-any.whl`,
+          `${base}vendor/pyodide/python_dateutil-2.9.0.post0-py2.py3-none-any.whl`,
+          `${base}vendor/pyodide/pytz-2024.1-py2.py3-none-any.whl`,
+          `${base}vendor/pyodide/pandas-2.2.0-cp312-cp312-pyodide_2024_0_wasm32.whl`,
+          `${base}vendor/pyodide/et_xmlfile-1.1.0-py3-none-any.whl`,
+          `${base}vendor/pyodide/openpyxl-3.1.5-py2.py3-none-any.whl`,
+          `${base}vendor/pyodide/xlrd-2.0.1-py2.py3-none-any.whl`
         ]);
 
         console.log('Successfully pre-loaded offline wheels: numpy, pandas, openpyxl, xlrd');
