@@ -13,8 +13,13 @@ self.onmessage = async (event) => {
       // Open a high-speed synchronous access handle to write raw contents
       const accessHandle = await fileHandle.createSyncAccessHandle();
       
-      const encoder = new TextEncoder();
-      const writeBuffer = encoder.encode(fileContent || '');
+      let writeBuffer;
+      if (fileContent instanceof Uint8Array) {
+        writeBuffer = fileContent;
+      } else {
+        const encoder = new TextEncoder();
+        writeBuffer = encoder.encode(fileContent || '');
+      }
       
       accessHandle.truncate(0); // Clear old content
       accessHandle.write(writeBuffer, { at: 0 });
@@ -46,10 +51,29 @@ self.onmessage = async (event) => {
       self.postMessage({ txId, type: 'SUCCESS', data: fileTree });
     }
 
+    if (action === 'GET_WORKSPACE_HANDLE') {
+      // Resolve/create the dedicated workspace directory handle
+      const workspaceHandle = await root.getDirectoryHandle('workspace', { create: true });
+      self.postMessage({ txId, type: 'SUCCESS', data: workspaceHandle });
+    }
+
   } catch (err) {
     self.postMessage({ txId, type: 'ERROR', error: err.message });
   }
 };
+
+// Helper to traverse and retrieve directory handles inside directory structures recursively
+async function getDirectoryHandleRecursive(rootHandle, dirPath, options = {}) {
+  const parts = dirPath.split('/');
+  let currentHandle = rootHandle;
+
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    if (!part || part === '.' || part === '..') continue;
+    currentHandle = await currentHandle.getDirectoryHandle(part, options);
+  }
+  return currentHandle;
+}
 
 // Helper to traverse and retrieve file handles inside directory structures recursively
 async function getFileHandleRecursive(rootHandle, filePath, options = {}) {

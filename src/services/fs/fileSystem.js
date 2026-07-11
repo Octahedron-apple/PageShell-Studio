@@ -30,5 +30,6 @@ function dispatchFsAction(action, payload = {}) {
 export const fileSystemAPI = {
   writeFile: (path, content) => dispatchFsAction('WRITE_FILE', { filePath: path, fileContent: content }),
   readFile: (path) => dispatchFsAction('READ_FILE', { filePath: path }),
-  getDirectoryTree: () => dispatchFsAction('GET_TREE')
+  getDirectoryTree: () => dispatchFsAction('GET_TREE'),
+  getWorkspaceHandle: () => dispatchFsAction('GET_WORKSPACE_HANDLE')
 };

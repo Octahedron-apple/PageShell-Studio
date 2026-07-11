@@ -1,3 +1,5 @@
+import { fileSystemAPI } from '../fs/fileSystem.js';
+
 const pendingTasks = new Map();
 let worker = null;
 
@@ -8,14 +10,25 @@ function getWorker() {
       { type: 'module' }
     );
 
+    // Handshake the workspace OPFS directory handle to the worker
+    fileSystemAPI.getWorkspaceHandle()
+      .then(workspaceHandle => {
+        worker.postMessage({ type: 'INIT', workspaceHandle });
+      })
+      .catch(err => {
+        console.error('Failed to resolve workspace handle for Pyodide:', err);
+      });
+
     worker.onmessage = (event) => {
       const { txId, type, data, error } = event.data;
 
       if (type === 'STDOUT') {
+        if (logSubscriber) logSubscriber({ type: 'stdout', text: data });
         console.log('[Python STDOUT]:', data);
         return;
       }
       if (type === 'STDERR') {
+        if (logSubscriber) logSubscriber({ type: 'stderr', text: data });
         console.error('[Python STDERR]:', data);
         return;
       }
@@ -50,3 +63,8 @@ export async function runPython(code, inputStringData = '') {
 }
 
 export const executePython = runPython;
+
+let logSubscriber = null;
+export function subscribePythonLogs(callback) {
+  logSubscriber = callback;
+}

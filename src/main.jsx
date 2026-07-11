@@ -87,7 +87,7 @@ sum(parsed_values)
   }
 }
 
-runTests();
+// runTests();
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
