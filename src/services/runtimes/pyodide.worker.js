@@ -12,7 +12,7 @@ function getPyodide() {
   if (!pyodidePromise) {
     pyodidePromise = (async () => {
       const pyodide = await loadPyodide({
-        indexURL: '/node_modules/pyodide/',
+        indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/',
         stdout: (text) => {
           self.postMessage({ txId: currentTxId, type: 'STDOUT', data: text });
         },
