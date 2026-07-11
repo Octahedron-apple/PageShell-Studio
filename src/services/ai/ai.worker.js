@@ -1,10 +1,11 @@
 import { env, pipeline, TextStreamer } from '@huggingface/transformers';
 
-// Configure Local Offline Flags
-env.allowLocalModels = true;
-env.allowRemoteModels = false;
-env.useBrowserCache = false;
-env.localModelPath = import.meta.env.BASE_URL + 'vendor/models/';
+// Load model from HuggingFace Hub — downloaded once and cached in IndexedDB.
+// This avoids bundling 70MB+ of weights into the GitHub Pages deployment artifact,
+// keeping CI fast and deployments small.
+env.allowLocalModels = false;
+env.allowRemoteModels = true;
+env.useBrowserCache = true;   // Caches weights in IndexedDB after first download
 
 // Disable nested proxy workers — we are already running inside a Web Worker
 env.backends.onnx.wasm.proxy = false;
@@ -13,7 +14,8 @@ env.backends.onnx.wasm.proxy = false;
 // spawning further nested workers (which Vite's dev server intercepts and breaks)
 env.backends.onnx.wasm.numThreads = 1;
 
-// Point WASM binary fetches at the local vendor folder.
+// Point WASM binary fetches at the local vendor folder (ort-*.wasm files).
+// These are small enough to bundle with the deployment.
 env.backends.onnx.wasm.wasmPaths = import.meta.env.BASE_URL + 'vendor/onnx/';
 
 let tgPipeline = null;
@@ -32,7 +34,8 @@ async function checkWebGPUSupport() {
 
 async function getPipeline() {
   if (!tgPipeline) {
-    const modelId = 'smollm2-135m-instruct';
+    // Use the official HuggingFace Hub model ID — weights download on first use.
+    const modelId = 'onnx-community/SmolLM2-135M-Instruct-ONNX';
     const isWebGPUSupported = await checkWebGPUSupport();
 
     if (isWebGPUSupported) {

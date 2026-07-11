@@ -92,6 +92,18 @@ if (typeof window === 'undefined') {
         // Derive scope from the script URL so it always matches the deployment subpath
         const scope = scriptSrc.substring(0, scriptSrc.lastIndexOf('/') + 1);
 
+        // Unregister any stale service workers from old scopes (e.g. /PageShell-Studio/)
+        // so they don't intercept requests meant for the current deployment scope.
+        nav.serviceWorker.getRegistrations().then((registrations) => {
+            for (const reg of registrations) {
+                if (reg.scope !== scope) {
+                    reg.unregister().then(() => {
+                        console.log('[COI] Unregistered stale SW at scope:', reg.scope);
+                    });
+                }
+            }
+        });
+
         nav.serviceWorker.register(scriptSrc, { scope }).then(
             (reg) => {
                 console.log('[COI] Service Worker registered, scope:', reg.scope);
