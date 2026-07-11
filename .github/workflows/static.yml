@@ -67,10 +67,21 @@ jobs:
           node-version: '20'
           cache: npm
 
-      - name: Install dependencies and Build
+      - name: Install dependencies
+        run: npm ci
+
+      # The ONNX runtime WASM/MJS files live in public/vendor/onnx/ locally but
+      # that directory is gitignored. Copy them from node_modules after npm ci.
+      - name: Copy ONNX runtime binaries to public/vendor/onnx
         run: |
-          npm ci
-          npm run build
+          mkdir -p public/vendor/onnx
+          cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.mjs  public/vendor/onnx/
+          cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm public/vendor/onnx/
+          cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.mjs       public/vendor/onnx/
+          cp node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.wasm      public/vendor/onnx/
+
+      - name: Build
+        run: npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
