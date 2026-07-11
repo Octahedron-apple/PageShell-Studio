@@ -137,13 +137,53 @@ except Exception as e:
     for (const filePath of selectedFiles) {
       try {
         const filename = filePath.split('/').pop();
-        const content = await fileSystemAPI.readFile(`workspace/${filename}`);
-        // Slice text dynamically (keeping the final 1500 characters of context)
-        const slicedContent = content.length > 1500 ? content.slice(-1500) : content;
-        contextText += `--- File: ${filename} ---\n${slicedContent}\n\n`;
+        
+        // Intercept Excel files for structural analysis via Pyodide
+        if (filename.toLowerCase().endsWith('.xlsx') || filename.toLowerCase().endsWith('.xls')) {
+          setLogs((prev) => [...prev, { type: 'info', text: `Analyzing Excel schema for ${filename}...` }]);
+          
+          const pythonCode = `
+import pandas as pd
+import json
+
+def preview_excel():
+    try:
+        # Bounded read to prevent crashes on massive sheets
+        df = pd.read_excel("${filename}", nrows=5)
+        
+        # Extract column structure and data types
+        schema = {str(col): str(dtype) for col, dtype in df.dtypes.items()}
+        
+        # Format a preview bundle (first 2 rows)
+        preview = df.head(2).to_dict(orient='records')
+        
+        return json.dumps({
+            "schema": schema,
+            "preview_rows": preview
+        }, indent=2)
+    except Exception as e:
+        return f"[Excel Context Extraction Failed: {str(e)}]"
+
+preview_excel()
+          `;
+          
+          try {
+            const result = await runPython(pythonCode);
+            contextText += `--- File: ${filename} (Excel Schema Snapshot) ---\n${result}\n\n`;
+            setLogs((prev) => [...prev, { type: 'success', text: `Successfully extracted schema for ${filename}` }]);
+          } catch (pyErr) {
+            contextText += `--- File: ${filename} (Excel Schema Snapshot) ---\n[Excel Context Extraction Failed: ${pyErr.message}]\n\n`;
+          }
+        } else {
+          // Standard text file reading with sliding window
+          const content = await fileSystemAPI.readFile(`workspace/${filename}`);
+          // Slice text dynamically (keeping the final 1500 characters of context)
+          const slicedContent = content.length > 1500 ? content.slice(-1500) : content;
+          contextText += `--- File: ${filename} ---\n${slicedContent}\n\n`;
+        }
       } catch (err) {
-        // If it's a binary file (like .xlsx), add metadata instead
-        contextText += `--- File: ${filePath.split('/').pop()} ---\n[Binary / Spreadsheet File Context]\n\n`;
+        // If file reading fails (e.g. unknown binary format), add metadata instead
+        contextText += `--- File: ${filePath.split('/').pop()} ---\n[Context Extraction Failed: ${err.message}]\n\n`;
       }
     }
 

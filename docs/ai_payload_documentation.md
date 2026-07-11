@@ -11,8 +11,15 @@ For plain text files, the system reads the file content from the Origin Private 
 - If the file is **larger than 1500 characters**, it only extracts and injects the **last 1500 characters** (using `content.slice(-1500)`).
 - If it's smaller, the whole file is injected.
 
-### Binary Files (Spreadsheets, Images)
-If a file cannot be read as plain text (e.g., it throws an error when trying to read a binary `.xlsx` file as UTF-8), the system falls back and injects a placeholder metadata string instead: `[Binary / Spreadsheet File Context]`.
+### Excel Files (.xlsx, .xls)
+When an Excel spreadsheet is selected, the application intercepts the file and spins up a micro **Python script** inside the background Pyodide sandbox. 
+1. It uses `pandas.read_excel(..., nrows=5)` to perform a bounded read directly from the OPFS storage, preventing massive enterprise sheets from crashing the browser.
+2. It extracts the structural dimensions (column names and their data types).
+3. It formats a preview bundle consisting of the schema and the first 2 rows of data.
+4. It returns this structural payload as a JSON string and injects it into the prompt under an `(Excel Schema Snapshot)` header.
+
+### Other Binary Files
+If a file is another unknown binary format that fails to read, the system falls back and injects a placeholder metadata string: `[Context Extraction Failed: error message]`.
 
 The concatenated file strings are then injected into the overarching **System Prompt**.
 
@@ -35,7 +42,7 @@ Here is the exact structure of the payload:
 [
   {
     "role": "system",
-    "content": "You are an offline coding assistant. Here is the relevant file context:\n--- File: script.py ---\nimport pandas as pd\n# ... (up to 1500 chars of code) ...\n\n--- File: data.xlsx ---\n[Binary / Spreadsheet File Context]\n\n"
+    "content": "You are an offline coding assistant. Here is the relevant file context:\n--- File: script.py ---\nimport pandas as pd\n# ... (up to 1500 chars of code) ...\n\n--- File: data.xlsx (Excel Schema Snapshot) ---\n{\n  \"schema\": {\n    \"Employee\": \"object\",\n    \"Salary\": \"int64\"\n  },\n  \"preview_rows\": [\n    {\n      \"Employee\": \"Alice Smith\",\n      \"Salary\": 85000\n    }\n  ]\n}\n\n"
   },
   {
     "role": "user",
