@@ -6,6 +6,7 @@ import FileManager from './components/FileManager.jsx';
 import Editor from './components/Editor.jsx';
 import Terminal from './components/Terminal.jsx';
 import AIAssistant from './components/AIAssistant.jsx';
+import Preview from './components/Preview.jsx';
 
 export default function App() {
   const [code, setCode] = useState(`import pandas as pd
@@ -41,6 +42,10 @@ except Exception as e:
   const [logs, setLogs] = useState([]);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  // 1. Define the View State
+  const [viewState, setViewState] = useState('editor'); // 'editor' | 'preview'
+  const [previewData, setPreviewData] = useState({ html: '', css: '', js: '' });
 
   // AI Assistant States
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -232,6 +237,33 @@ preview_excel()
     );
   };
 
+  // Launch preview mode by loading the files from OPFS
+  const handlePreview = async () => {
+    try {
+      // 2. Prepare the File Data
+      const html = await fileSystemAPI.readFile('workspace/index.html').catch(() => '');
+      const css = await fileSystemAPI.readFile('workspace/styles.css').catch(() => '');
+      const js = await fileSystemAPI.readFile('workspace/script.js').catch(() => '');
+      
+      setPreviewData({ html, css, js });
+      setViewState('preview');
+    } catch (e) {
+      console.error('Failed to prepare preview data', e);
+    }
+  };
+
+  // 3. Implement Conditional Rendering
+  if (viewState === 'preview') {
+    return (
+      <Preview 
+        htmlContent={previewData.html}
+        cssContent={previewData.css}
+        jsContent={previewData.js}
+        onBack={() => setViewState('editor')}
+      />
+    );
+  }
+
   return (
     <div style={styles.container}>
       {/* Header */}
@@ -240,9 +272,14 @@ preview_excel()
           <span style={styles.logoIcon}>🔮</span>
           <h1 style={styles.title}>PageShell Studio</h1>
         </div>
-        <div style={styles.badge}>
-          <span style={styles.badgeIndicator}></span>
-          Offline Container Core Active
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <button onClick={handlePreview} style={styles.previewButton}>
+            Launch Preview
+          </button>
+          <div style={styles.badge}>
+            <span style={styles.badgeIndicator}></span>
+            Offline Container Core Active
+          </div>
         </div>
       </header>
 
@@ -380,5 +417,16 @@ const styles = {
   aiArea: {
     height: '100%',
     overflow: 'hidden'
+  },
+  previewButton: {
+    backgroundColor: '#34495e',
+    color: '#fff',
+    border: '1px solid #455a64',
+    padding: '6px 14px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '13px',
+    transition: 'background-color 0.2s',
   }
 };
