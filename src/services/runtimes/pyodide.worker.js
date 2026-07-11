@@ -6,15 +6,39 @@ let currentTxId = null;
 function getPyodide() {
   if (!pyodidePromise) {
     // Specify indexURL pointing directly to local node_modules served by Vite
-    pyodidePromise = loadPyodide({
-      indexURL: '/node_modules/pyodide/',
-      stdout: (text) => {
-        self.postMessage({ txId: currentTxId, type: 'STDOUT', data: text });
-      },
-      stderr: (text) => {
-        self.postMessage({ txId: currentTxId, type: 'STDERR', data: text });
+    pyodidePromise = (async () => {
+      const pyodide = await loadPyodide({
+        indexURL: '/node_modules/pyodide/',
+        stdout: (text) => {
+          self.postMessage({ txId: currentTxId, type: 'STDOUT', data: text });
+        },
+        stderr: (text) => {
+          self.postMessage({ txId: currentTxId, type: 'STDERR', data: text });
+        }
+      });
+
+      try {
+        // Access browser's OPFS root
+        const root = await navigator.storage.getDirectory();
+
+        // Create virtual directory path if it doesn't exist
+        try {
+          pyodide.FS.mkdir('/workspace');
+        } catch (e) {
+          // Ignore if directory already exists
+        }
+
+        // Mount OPFS directory handle into Pyodide filesystem
+        await pyodide.mountNativeFS('/workspace', root);
+
+        // Change current directory so relative file operations target OPFS directly
+        pyodide.FS.chdir('/workspace');
+      } catch (err) {
+        console.error('Failed to mount OPFS inside Pyodide worker:', err);
       }
-    });
+
+      return pyodide;
+    })();
   }
   return pyodidePromise;
 }

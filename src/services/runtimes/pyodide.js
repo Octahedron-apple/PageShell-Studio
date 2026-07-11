@@ -48,3 +48,5 @@ export async function runPython(code, inputStringData = '') {
     w.postMessage({ txId, pythonCodeString: code, inputStringData });
   });
 }
+
+export const executePython = runPython;
