@@ -1,6 +1,67 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
+import { EditorState } from '@codemirror/state';
+import { EditorView, basicSetup } from 'codemirror';
+import { python } from '@codemirror/lang-python';
+import { oneDark } from '@codemirror/theme-one-dark';
 
 export default function Editor({ code, onChange, onRun, loading }) {
+  const editorContainerRef = useRef(null);
+  const viewRef = useRef(null);
+
+  // Initialize CodeMirror instance
+  useEffect(() => {
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged && update.transactions.some(tr => tr.isUserEvent('input') || tr.isUserEvent('delete') || tr.isUserEvent('undo') || tr.isUserEvent('redo') || tr.isUserEvent('paste') || tr.isUserEvent('cut'))) {
+        // Trigger onChange only if it's a real user edit, to prevent circular updates
+        onChange(update.state.doc.toString());
+      }
+    });
+
+    const state = EditorState.create({
+      doc: code,
+      extensions: [
+        basicSetup,
+        python(),
+        oneDark,
+        updateListener,
+        // Make the editor take full height of its wrapper
+        EditorView.theme({
+          "&": { height: "100%", width: "100%", backgroundColor: "#1a1a1e" },
+          ".cm-scroller": { fontFamily: "'Fira Code', 'Courier New', Courier, monospace" }
+        })
+      ]
+    });
+
+    const view = new EditorView({
+      state,
+      parent: editorContainerRef.current
+    });
+    
+    viewRef.current = view;
+
+    // Cleanup when component unmounts
+    return () => {
+      if (viewRef.current) {
+        viewRef.current.destroy();
+        viewRef.current = null;
+      }
+    };
+  // Run only on initial mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sync external state changes into the editor (e.g. from file loading)
+  useEffect(() => {
+    const view = viewRef.current;
+    if (view) {
+      const currentDoc = view.state.doc.toString();
+      if (code !== currentDoc) {
+        view.dispatch({
+          changes: { from: 0, to: currentDoc.length, insert: code }
+        });
+      }
+    }
+  }, [code]);
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -20,13 +81,10 @@ export default function Editor({ code, onChange, onRun, loading }) {
           {loading ? 'Running...' : 'Run Analysis (F5)'}
         </button>
       </div>
-      <textarea
-        value={code}
-        onChange={(e) => onChange(e.target.value)}
-        style={styles.textarea}
-        spellCheck="false"
-        id="editor-textarea"
-        placeholder="Write your Python script here..."
+      <div 
+        ref={editorContainerRef}
+        style={styles.editorWrapper}
+        id="editor-container"
       />
     </div>
   );
@@ -83,16 +141,11 @@ const styles = {
       transform: 'translateY(0)'
     }
   },
-  textarea: {
+  editorWrapper: {
     flex: 1,
+    overflow: 'hidden',
     backgroundColor: '#1a1a1e',
-    color: '#cbd5e0',
-    border: 'none',
-    padding: '20px',
-    fontFamily: "'Fira Code', 'Courier New', Courier, monospace",
-    fontSize: '14px',
-    lineHeight: '1.6',
-    resize: 'none',
-    outline: 'none'
+    display: 'flex',
+    flexDirection: 'column'
   }
 };
