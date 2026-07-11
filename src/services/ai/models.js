@@ -14,6 +14,7 @@ function getWorker() {
       const { type, token, output, error, message } = event.data;
       
       if (type === 'STATUS') {
+        if (statusSubscriber) statusSubscriber(message);
         console.log(`[AI Worker Status]: ${message}`);
       } else if (type === 'TOKEN') {
         accumulatedOutput += token;
@@ -45,4 +46,9 @@ export function generateCode(prompt, onToken, onComplete) {
   currentOnComplete = onComplete;
   accumulatedOutput = '';
   worker.postMessage({ action: 'GENERATE', prompt });
+}
+
+let statusSubscriber = null;
+export function subscribeAIStatus(callback) {
+  statusSubscriber = callback;
 }

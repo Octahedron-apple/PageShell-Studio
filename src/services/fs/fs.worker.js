@@ -13,18 +13,21 @@ self.onmessage = async (event) => {
       // Open a high-speed synchronous access handle to write raw contents
       const accessHandle = await fileHandle.createSyncAccessHandle();
       
-      let writeBuffer;
-      if (fileContent instanceof Uint8Array) {
-        writeBuffer = fileContent;
-      } else {
-        const encoder = new TextEncoder();
-        writeBuffer = encoder.encode(fileContent || '');
+      try {
+        let writeBuffer;
+        if (fileContent instanceof Uint8Array) {
+          writeBuffer = fileContent;
+        } else {
+          const encoder = new TextEncoder();
+          writeBuffer = encoder.encode(fileContent || '');
+        }
+        
+        accessHandle.truncate(0); // Clear old content
+        accessHandle.write(writeBuffer, { at: 0 });
+        accessHandle.flush(); // Commit data changes to system disk
+      } finally {
+        accessHandle.close(); // Release file lock
       }
-      
-      accessHandle.truncate(0); // Clear old content
-      accessHandle.write(writeBuffer, { at: 0 });
-      accessHandle.flush(); // Commit data changes to system disk
-      accessHandle.close(); // Release file lock
 
       self.postMessage({ txId, type: 'SUCCESS' });
     }
@@ -33,14 +36,16 @@ self.onmessage = async (event) => {
       const fileHandle = await getFileHandleRecursive(root, filePath);
       const accessHandle = await fileHandle.createSyncAccessHandle();
       
-      const fileSize = accessHandle.getSize();
-      const readBuffer = new Uint8Array(fileSize);
-      
-      accessHandle.read(readBuffer, { at: 0 });
-      accessHandle.close();
-
-      const decoder = new TextDecoder();
-      const textContent = decoder.decode(readBuffer);
+      let textContent = '';
+      try {
+        const fileSize = accessHandle.getSize();
+        const readBuffer = new Uint8Array(fileSize);
+        accessHandle.read(readBuffer, { at: 0 });
+        const decoder = new TextDecoder();
+        textContent = decoder.decode(readBuffer);
+      } finally {
+        accessHandle.close();
+      }
 
       self.postMessage({ txId, type: 'SUCCESS', data: textContent });
     }

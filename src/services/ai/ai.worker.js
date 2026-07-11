@@ -1,10 +1,10 @@
 import { env, pipeline, TextStreamer } from '@huggingface/transformers';
 
 // Configure Local Offline Flags
-// allowLocalModels set to false ensures that if the model is not found in the browser cache,
-// it will pull from Hugging Face Hub. Once fetched, the browser cache will serve it.
-env.allowLocalModels = false;
-env.useBrowserCache = true;
+env.allowLocalModels = true;
+env.allowRemoteModels = false;
+env.useBrowserCache = false;
+env.localModelPath = '/vendor/models/';
 
 // Disable nested proxy workers — we are already running inside a Web Worker
 env.backends.onnx.wasm.proxy = false;
@@ -34,8 +34,7 @@ async function checkWebGPUSupport() {
 
 async function getPipeline() {
   if (!tgPipeline) {
-    // Target the lightweight, powerful local LLM model converted for ONNX
-    const modelId = 'onnx-community/Qwen2.5-Coder-0.5B-Instruct';
+    const modelId = 'smollm2-135m-instruct';
     const isWebGPUSupported = await checkWebGPUSupport();
 
     if (isWebGPUSupported) {
@@ -81,7 +80,7 @@ self.onmessage = async (e) => {
       // Prepare standard chat template or send raw string
       // Let's format the prompt using a chat template if preferred, or run it directly.
       // Since Qwen2.5-Coder-0.5B-Instruct expects assistant template, let's do a simple formatting
-      const messages = [
+      const messages = Array.isArray(prompt) ? prompt : [
         { role: 'user', content: prompt }
       ];
 

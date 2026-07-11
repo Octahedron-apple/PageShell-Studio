@@ -32,8 +32,8 @@ function getPyodide() {
           // Ignore if directory already exists
         }
 
-        // Mount OPFS directory handle into Pyodide filesystem using native Emscripten OPFS
-        pyodide.FS.mount(pyodide.FS.filesystems.OPFS, { root: workspaceHandle }, '/workspace');
+        // Mount OPFS directory handle into Pyodide filesystem using native mountNativeFS
+        await pyodide.mountNativeFS('/workspace', workspaceHandle);
 
         // Change current directory so relative file operations target OPFS directly
         pyodide.FS.chdir('/workspace');
