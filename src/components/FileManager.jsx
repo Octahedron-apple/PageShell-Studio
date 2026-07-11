@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function FileManager({ files, onUpload, selectedFiles = [], onToggleSelect }) {
+export default function FileManager({ files, onUpload, selectedFiles = [], onToggleSelect, onOpenFile }) {
   const [dragActive, setDragActive] = useState(false);
 
   const handleDrag = (e) => {
@@ -65,7 +65,13 @@ export default function FileManager({ files, onUpload, selectedFiles = [], onTog
                   style={styles.checkbox}
                 />
                 <span style={styles.fileIcon}>📄</span>
-                <span style={styles.fileName}>{file.name}</span>
+                <span 
+                  style={styles.fileName} 
+                  onClick={() => onOpenFile && onOpenFile(file.path)}
+                  title="Click to edit"
+                >
+                  {file.name}
+                </span>
                 <span style={styles.fileType}>
                   {file.name.split('.').pop().toUpperCase()}
                 </span>
@@ -177,7 +183,11 @@ const styles = {
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-    color: '#e2e8f0'
+    color: '#e2e8f0',
+    cursor: 'pointer',
+    '&:hover': {
+      textDecoration: 'underline'
+    }
   },
   fileType: {
     fontSize: '9px',

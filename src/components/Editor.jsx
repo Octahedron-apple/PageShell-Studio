@@ -1,29 +1,52 @@
 import React, { useEffect, useRef } from 'react';
 import { EditorState } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
+import { keymap } from '@codemirror/view';
 import { python } from '@codemirror/lang-python';
+import { html } from '@codemirror/lang-html';
+import { css } from '@codemirror/lang-css';
+import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 
-export default function Editor({ code, onChange, onRun, loading }) {
+export default function Editor({ code, activeFile, onChange, onRun, onSave, loading }) {
   const editorContainerRef = useRef(null);
   const viewRef = useRef(null);
+  
+  const onChangeRef = useRef(onChange);
+  const onSaveRef = useRef(onSave);
+  
+  useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
+  useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
 
   // Initialize CodeMirror instance
   useEffect(() => {
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged && update.transactions.some(tr => tr.isUserEvent('input') || tr.isUserEvent('delete') || tr.isUserEvent('undo') || tr.isUserEvent('redo') || tr.isUserEvent('paste') || tr.isUserEvent('cut'))) {
-        // Trigger onChange only if it's a real user edit, to prevent circular updates
-        onChange(update.state.doc.toString());
+        if (onChangeRef.current) onChangeRef.current(update.state.doc.toString());
       }
     });
+
+    const saveKeymap = keymap.of([
+      {
+        key: 'Mod-s',
+        run: (v) => {
+          if (onSaveRef.current) onSaveRef.current(v.state.doc.toString());
+          return true;
+        }
+      }
+    ]);
+
+    const ext = activeFile ? activeFile.split('.').pop().toLowerCase() : 'py';
+    const langExt = ext === 'html' ? html() : ext === 'css' ? css() : ext === 'js' ? javascript() : python();
 
     const state = EditorState.create({
       doc: code,
       extensions: [
         basicSetup,
-        python(),
+        langExt,
         oneDark,
         updateListener,
+        saveKeymap,
         // Make the editor take full height of its wrapper
         EditorView.theme({
           "&": { height: "100%", width: "100%", backgroundColor: "#1a1a1e" },
@@ -46,9 +69,9 @@ export default function Editor({ code, onChange, onRun, loading }) {
         viewRef.current = null;
       }
     };
-  // Run only on initial mount
+  // Re-initialize editor when activeFile changes to swap language extensions
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [activeFile]);
 
   // Sync external state changes into the editor (e.g. from file loading)
   useEffect(() => {
@@ -67,7 +90,7 @@ export default function Editor({ code, onChange, onRun, loading }) {
       <div style={styles.header}>
         <div style={styles.titleArea}>
           <span style={styles.editorIcon}>📝</span>
-          <span style={styles.title}>Python Editor</span>
+          <span style={styles.title}>{activeFile ? activeFile.split('/').pop() : 'Editor'}</span>
         </div>
         <button
           onClick={onRun}

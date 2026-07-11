@@ -42,6 +42,7 @@ except Exception as e:
   const [logs, setLogs] = useState([]);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [activeFile, setActiveFile] = useState(null);
 
   // 1. Define the View State
   const [viewState, setViewState] = useState('editor'); // 'editor' | 'preview'
@@ -132,6 +133,33 @@ button {
       }
     } catch (err) {
       console.error("Failed to initialize default web files:", err);
+    }
+  };
+
+  const handleOpenFile = async (filePath) => {
+    try {
+      const ext = filePath.split('.').pop().toLowerCase();
+      if (['png', 'jpg', 'jpeg', 'gif', 'xlsx', 'xls', 'whl', 'wasm'].includes(ext)) {
+        setLogs((prev) => [...prev, { type: 'stderr', text: `Cannot open binary file ${filePath} in editor.` }]);
+        return;
+      }
+      const content = await fileSystemAPI.readFile(filePath);
+      setCode(content);
+      setActiveFile(filePath);
+      setLogs((prev) => [...prev, { type: 'info', text: `Opened ${filePath} in editor.` }]);
+    } catch (err) {
+      setLogs((prev) => [...prev, { type: 'stderr', text: `Failed to open file: ${err.message}` }]);
+    }
+  };
+
+  const handleSaveFile = async (newCode) => {
+    if (!activeFile) return;
+    try {
+      const encoder = new TextEncoder();
+      await fileSystemAPI.writeFile(activeFile, encoder.encode(newCode));
+      setLogs((prev) => [...prev, { type: 'success', text: `Saved ${activeFile}.` }]);
+    } catch (err) {
+      setLogs((prev) => [...prev, { type: 'stderr', text: `Failed to save file: ${err.message}` }]);
     }
   };
 
@@ -359,16 +387,19 @@ preview_excel()
             onUpload={handleUpload} 
             selectedFiles={selectedFiles}
             onToggleSelect={handleToggleFileSelect}
+            onOpenFile={handleOpenFile}
           />
         </section>
 
-        {/* Middle Column: Python Editor & Terminal */}
+        {/* Middle Column: Editor & Terminal */}
         <section style={styles.editorArea}>
           <div style={styles.editorFlex}>
             <Editor 
               code={code} 
+              activeFile={activeFile}
               onChange={setCode} 
               onRun={handleRun} 
+              onSave={handleSaveFile}
               loading={loading} 
             />
           </div>
