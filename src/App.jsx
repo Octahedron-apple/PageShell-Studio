@@ -269,7 +269,7 @@ preview_excel()
       {/* Header */}
       <header style={styles.header}>
         <div style={styles.logoArea}>
-          <span style={styles.logoIcon}>🔮</span>
+          <img src={`${import.meta.env.BASE_URL}assets/logo.png`} alt="PageShell Studio" style={styles.logoImage} />
           <h1 style={styles.title}>PageShell Studio</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
@@ -355,10 +355,13 @@ const styles = {
   logoArea: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px'
+    gap: '12px'
   },
-  logoIcon: {
-    fontSize: '24px'
+  logoImage: {
+    height: '28px',
+    width: 'auto',
+    display: 'block',
+    borderRadius: '6px'
   },
   title: {
     fontSize: '18px',

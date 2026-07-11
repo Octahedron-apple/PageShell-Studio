@@ -15,14 +15,8 @@ os.makedirs(wheels_dir, exist_ok=True)
 
 jsdelivr_base = "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
 jsdelivr_wheels = [
-    "numpy-1.26.4-cp312-cp312-pyodide_2024_0_wasm32.whl",
-    "pandas-2.2.0-cp312-cp312-pyodide_2024_0_wasm32.whl",
-    "xlrd-2.0.1-py2.py3-none-any.whl",
-    "python_dateutil-2.9.0.post0-py2.py3-none-any.whl",
-    "pytz-2024.1-py2.py3-none-any.whl",
-    "six-1.16.0-py2.py3-none-any.whl",
-    "packaging-23.2-py3-none-any.whl",
-    "micropip-0.6.0-py3-none-any.whl"
+    # C-extension dependencies like numpy and pandas are loaded dynamically 
+    # via pyodide.loadPackage() so they link correctly.
 ]
 
 def download_wheel(url, filename):

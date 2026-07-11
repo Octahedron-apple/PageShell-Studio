@@ -38,24 +38,20 @@ function getPyodide() {
         // Change current directory so relative file operations target OPFS directly
         pyodide.FS.chdir('/workspace');
 
-        // Load local packaging and micropip for 100% offline installs
-        const base = import.meta.env.BASE_URL;
-        await pyodide.loadPackage(`${base}vendor/pyodide/packaging-23.2-py3-none-any.whl`);
-        await pyodide.loadPackage(`${base}vendor/pyodide/micropip-0.6.0-py3-none-any.whl`);
+        // 1. Load native C-extension packages directly via Pyodide so it handles .so dynamic linking
+        await pyodide.loadPackage(['numpy', 'pandas']);
 
+        // 2. Load pure-Python wheels via micropip
+        await pyodide.loadPackage('micropip');
         const micropip = pyodide.pyimport('micropip');
+        const base = import.meta.env.BASE_URL;
         await micropip.install([
-          `${base}vendor/pyodide/numpy-1.26.4-cp312-cp312-pyodide_2024_0_wasm32.whl`,
-          `${base}vendor/pyodide/six-1.16.0-py2.py3-none-any.whl`,
-          `${base}vendor/pyodide/python_dateutil-2.9.0.post0-py2.py3-none-any.whl`,
-          `${base}vendor/pyodide/pytz-2024.1-py2.py3-none-any.whl`,
-          `${base}vendor/pyodide/pandas-2.2.0-cp312-cp312-pyodide_2024_0_wasm32.whl`,
           `${base}vendor/pyodide/et_xmlfile-1.1.0-py3-none-any.whl`,
           `${base}vendor/pyodide/openpyxl-3.1.5-py2.py3-none-any.whl`,
           `${base}vendor/pyodide/xlrd-2.0.1-py2.py3-none-any.whl`
         ]);
 
-        console.log('Successfully pre-loaded offline wheels: numpy, pandas, openpyxl, xlrd');
+        console.log('Successfully pre-loaded packages: numpy, pandas, openpyxl, xlrd');
       } catch (err) {
         console.error('Failed to mount or load offline packages inside Pyodide worker:', err);
       }
