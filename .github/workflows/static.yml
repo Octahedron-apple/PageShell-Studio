@@ -37,8 +37,7 @@ jobs:
           python-version: '3.10'
       - name: Download offline packages and AI model weights
         run: |
-          python scripts/download_wheels.py
-          python scripts/download_model.py
+          python setup_assets.py
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
