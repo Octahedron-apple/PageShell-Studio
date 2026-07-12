@@ -58,10 +58,10 @@ export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLog
       <div style={styles.chatArea} id="ai-chat-body">
         {aiLogs.length === 0 ? (
           <div style={styles.introCard}>
-            <h4 style={styles.introTitle}>Qwen2.5-Coder 1.5B Instruct</h4>
+            <h4 style={styles.introTitle}>Qwen2.5-Coder 0.5B Instruct</h4>
             <p style={styles.introText}>
               Your offline code assistant runs 100% in a background WebGPU/WASM worker.
-              On first use, ~900MB of model weights are downloaded and cached in your browser's IndexedDB.
+              On first use, ~350MB of model weights are downloaded and cached in your browser's IndexedDB.
               Check files in the sidebar to attach them as context.
             </p>
           </div>

@@ -34,8 +34,8 @@ async function checkWebGPUSupport() {
 
 async function getPipeline() {
   if (!tgPipeline) {
-    // Qwen2.5-Coder-1.5B-Instruct — code-tuned, ONNX q4, ~900MB cached after first load.
-    const modelId = 'onnx-community/Qwen2.5-Coder-1.5B-Instruct';
+    // Qwen2.5-Coder-0.5B-Instruct — code-tuned, ONNX q4, ~350MB cached after first load.
+    const modelId = 'onnx-community/Qwen2.5-Coder-0.5B-Instruct';
     const isWebGPUSupported = await checkWebGPUSupport();
 
     // Forward HuggingFace download progress to the UI status bar
