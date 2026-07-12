@@ -3,6 +3,7 @@ import { fileSystemAPI } from '../services/fs/fileSystem.js';
 import { runPython, subscribePythonLogs } from '../services/runtimes/pyodide.js';
 import { runJS } from '../services/runtimes/quickjs.js';
 import { generateCode, subscribeAIStatus } from '../services/ai/models.js';
+import { indexDocument, retrieveChunks } from '../services/ai/rag.js';
 import localforage from 'localforage';
 
 const AppContext = createContext(null);
@@ -34,6 +35,11 @@ export function AppProvider({ children }) {
   const [aiLogs, setAiLogs] = useState([]);
   const [statusMessage, setStatusMessage] = useState('AI worker offline. Submit a query to trigger model loading.');
   const [aiStreaming, setAiStreaming] = useState(false);
+
+  // --- RAG State ---
+  // ragIndices: Map<filePath, MiniSearch index>
+  const [ragIndices, setRagIndices] = useState(new Map());
+  const [ragStatus, setRagStatus] = useState('');
 
   // --- File System Helpers ---
   const refreshFiles = async () => {
@@ -220,6 +226,43 @@ except Exception as e:
     );
   };
 
+  // --- RAG Indexing ---
+  // Whenever the selected files change, extract and index any PDF or DOCX files.
+  useEffect(() => {
+    const ragExtensions = ['pdf', 'docx'];
+    const filesToIndex = selectedFiles.filter(fp => {
+      const ext = fp.toLowerCase().split('.').pop();
+      return ragExtensions.includes(ext) && !ragIndices.has(fp);
+    });
+
+    if (filesToIndex.length === 0) return;
+
+    const indexFiles = async () => {
+      const newIndices = new Map(ragIndices);
+      for (const filePath of filesToIndex) {
+        const filename = filePath.split('/').pop();
+        setRagStatus(`Indexing ${filename} for RAG...`);
+        try {
+          const bytes = await fileSystemAPI.readFileBinary(filePath);
+          const result = await indexDocument(bytes, filename);
+          if (result) {
+            newIndices.set(filePath, result.index);
+            setRagStatus(`Indexed ${filename}: ${result.chunkCount} chunks`);
+          } else {
+            setRagStatus(`Could not index ${filename} (unsupported type or empty)`);
+          }
+        } catch (err) {
+          setRagStatus(`Failed to index ${filename}: ${err.message}`);
+          console.error('RAG indexing error:', err);
+        }
+      }
+      setRagIndices(newIndices);
+    };
+
+    indexFiles();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFiles]);
+
   const generateCodeAsync = (messages, onToken, tools) => {
     return new Promise((resolve) => {
       generateCode(messages, onToken, (fullOutput, tool_calls) => {
@@ -258,10 +301,36 @@ except Exception as e:
     setAiLogs(prev => [...prev, { sender: 'user', text: queryText }]);
 
     let contextText = '';
+
+    // ── RAG Retrieval ──
+    // For any selected PDF/DOCX with a built index, retrieve the top relevant chunks.
+    const ragExtensions = ['pdf', 'docx'];
+    const ragResults = [];
+    for (const filePath of selectedFiles) {
+      const ext = filePath.toLowerCase().split('.').pop();
+      if (ragExtensions.includes(ext) && ragIndices.has(filePath)) {
+        const index = ragIndices.get(filePath);
+        const chunks = retrieveChunks(index, queryText, 5);
+        ragResults.push(...chunks);
+      }
+    }
+    if (ragResults.length > 0) {
+      contextText += '--- Relevant excerpts retrieved via RAG ---\n';
+      ragResults.forEach((chunk, i) => {
+        contextText += `[${i + 1}] (from ${chunk.source}):\n${chunk.text}\n\n`;
+      });
+    }
+
+    // ── Direct Context (non-RAG files) ──
     for (const filePath of selectedFiles) {
       try {
         const filename = filePath.split('/').pop();
-        if (filename.toLowerCase().endsWith('.xlsx') || filename.toLowerCase().endsWith('.xls')) {
+        const ext = filename.toLowerCase().split('.').pop();
+
+        // Skip PDF/DOCX files — their content is handled by RAG above
+        if (['pdf', 'docx'].includes(ext)) continue;
+
+        if (['xlsx', 'xls'].includes(ext)) {
           setLogs(prev => [...prev, { type: 'info', text: `Analyzing Excel schema for ${filename}...` }]);
           const pythonCode = `
 import pandas as pd
@@ -488,6 +557,7 @@ To use a tool, output a tool call using the following XML format. Stop generatin
       files, logs, setLogs,
       selectedFiles, aiLogs, setAiLogs, statusMessage, aiStreaming,
       runTarget, setRunTarget,
+      ragStatus, ragIndices,
       handleRun, handleUpload, handleOpenFile, handleSaveFile,
       handleToggleFileSelect, handleQuery, refreshFiles, handleAutocomplete,
     }}>

@@ -8,7 +8,7 @@ export default function AIPage() {
     files, selectedFiles, aiLogs, setAiLogs,
     statusMessage, handleQuery, handleUpload,
     handleToggleFileSelect, handleOpenFile,
-    aiStreaming,
+    aiStreaming, ragStatus, ragIndices,
   } = useApp();
 
   return (
@@ -22,6 +22,8 @@ export default function AIPage() {
           onClearLogs={() => setAiLogs([])}
           statusMessage={statusMessage}
           aiStreaming={aiStreaming}
+          ragStatus={ragStatus}
+          ragIndices={ragIndices}
         />
       </main>
     </div>

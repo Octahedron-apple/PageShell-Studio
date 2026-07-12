@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 
-export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLogs, statusMessage, aiStreaming }) {
+export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLogs, statusMessage, aiStreaming, ragStatus, ragIndices }) {
   const [query, setQuery] = useState('');
   const logsEndRef = useRef(null);
 
@@ -40,6 +40,17 @@ export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLog
           <span style={styles.activeContext}>{selectedFiles.map(f => f.split('/').pop()).join(', ')}</span>
         )}
       </div>
+
+      {/* RAG Indexing Status */}
+      {ragStatus && (
+        <div style={styles.ragStatusBar}>
+          <span style={styles.ragDot} />
+          <span style={styles.ragStatusText}>{ragStatus}</span>
+          {ragIndices && ragIndices.size > 0 && (
+            <span style={styles.ragBadge}>📚 {ragIndices.size} indexed</span>
+          )}
+        </div>
+      )}
 
       {/* Status Bar — always visible, highlighted during downloads */}
       {(() => {
@@ -210,6 +221,41 @@ const styles = {
     color: '#f59e0b',
     backgroundColor: 'rgba(245, 158, 11, 0.12)',
     border: '1px solid rgba(245, 158, 11, 0.3)',
+    padding: '2px 7px',
+    borderRadius: '10px',
+    flexShrink: 0,
+  },
+  ragStatusBar: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '5px 16px',
+    backgroundColor: 'rgba(99, 179, 237, 0.06)',
+    borderBottom: '1px solid rgba(99, 179, 237, 0.15)',
+    fontSize: '11px',
+    flexShrink: 0,
+  },
+  ragDot: {
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    backgroundColor: '#63b3ed',
+    boxShadow: '0 0 6px #63b3ed',
+    flexShrink: 0,
+    animation: 'pulse 1.5s infinite',
+  },
+  ragStatusText: {
+    color: '#63b3ed',
+    flex: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  ragBadge: {
+    fontSize: '10px',
+    color: '#4facfe',
+    backgroundColor: 'rgba(79, 172, 254, 0.1)',
+    border: '1px solid rgba(79, 172, 254, 0.25)',
     padding: '2px 7px',
     borderRadius: '10px',
     flexShrink: 0,
