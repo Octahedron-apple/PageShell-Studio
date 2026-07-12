@@ -34,7 +34,7 @@ async function getEngine() {
 }
 
 self.onmessage = async (e) => {
-  const { action, prompt } = e.data;
+  const { action, prompt, tools } = e.data;
 
   if (action === 'GENERATE') {
     try {
@@ -44,22 +44,57 @@ self.onmessage = async (e) => {
         { role: 'user', content: prompt }
       ];
 
-      const chunks = await eng.chat.completions.create({
+      const request = {
         messages,
         temperature: 0.3,
         stream: true,
-      });
+      };
+      
+      if (tools && tools.length > 0) {
+        request.tools = tools;
+      }
+
+      const chunks = await eng.chat.completions.create(request);
 
       let finalOutput = '';
+      let toolCalls = [];
+
       for await (const chunk of chunks) {
         const token = chunk.choices[0]?.delta?.content || '';
         finalOutput += token;
+        
+        // Accumulate tool calls natively
+        if (chunk.choices[0]?.delta?.tool_calls) {
+          for (const tcDelta of chunk.choices[0].delta.tool_calls) {
+            const index = tcDelta.index;
+            if (!toolCalls[index]) {
+              toolCalls[index] = {
+                id: tcDelta.id || '',
+                type: 'function',
+                function: { name: tcDelta.function?.name || '', arguments: tcDelta.function?.arguments || '' }
+              };
+            } else {
+              if (tcDelta.function?.name) toolCalls[index].function.name += tcDelta.function.name;
+              if (tcDelta.function?.arguments) toolCalls[index].function.arguments += tcDelta.function.arguments;
+            }
+          }
+        }
+
         // Stream token to main thread
-        self.postMessage({ type: 'TOKEN', token });
+        if (token) {
+          self.postMessage({ type: 'TOKEN', token });
+        }
       }
 
+      // Clean up tool calls array
+      const finalToolCalls = toolCalls.filter(tc => tc && tc.function && tc.function.name);
+
       // Signal completion
-      self.postMessage({ type: 'COMPLETE', output: finalOutput });
+      self.postMessage({ 
+        type: 'COMPLETE', 
+        output: finalOutput,
+        tool_calls: finalToolCalls.length > 0 ? finalToolCalls : undefined 
+      });
 
     } catch (err) {
       console.error('Error during generation:', err);

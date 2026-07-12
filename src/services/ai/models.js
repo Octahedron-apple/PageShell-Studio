@@ -22,8 +22,9 @@ function getWorker() {
           currentOnToken(token);
         }
       } else if (type === 'COMPLETE') {
+        const { output, tool_calls } = event.data;
         if (currentOnComplete) {
-          currentOnComplete(accumulatedOutput || output);
+          currentOnComplete(accumulatedOutput || output, tool_calls);
         }
         currentOnToken = null;
         currentOnComplete = null;
@@ -40,12 +41,12 @@ function getWorker() {
   return aiWorker;
 }
 
-export function generateCode(prompt, onToken, onComplete) {
+export function generateCode(prompt, onToken, onComplete, tools) {
   const worker = getWorker();
   currentOnToken = onToken;
   currentOnComplete = onComplete;
   accumulatedOutput = '';
-  worker.postMessage({ action: 'GENERATE', prompt });
+  worker.postMessage({ action: 'GENERATE', prompt, tools });
 }
 
 let statusSubscriber = null;
