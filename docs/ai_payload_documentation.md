@@ -42,7 +42,24 @@ To allow the AI to maintain context of the conversation without overflowing the 
 
 It then strictly caps this array to the **last 6 messages** (`historyMessages.slice(-6)`). Older messages are pruned from the prompt.
 
-## 3. The Exact JSON Payload Structure
+## 3. Tool Protocols & Interception Mechanism
+
+The system now supports **Tool Calling**, allowing the AI to break out of the chat UI and execute actions within the local PageShell Studio environment.
+
+### Defined Protocols
+The AI is provided with JSON schemas for the following local capabilities injected directly into the System Prompt:
+- **`write_file`**: Instructs the `fileSystemAPI` worker to write string content to a specified path in the Origin Private File System (OPFS).
+- **`run_python`**: Instructs the `Pyodide` worker to evaluate a python script directly within the client-side WebAssembly sandbox.
+
+### The Managed Execution Loop
+The `handleQuery` function is a managed `while(true)` execution loop:
+1. It requests the AI to generate a response.
+2. It awaits the full generation string and scans it for an XML tool call payload (e.g., `<tool_call>{"name": "write_file", "args": {...}}</tool_call>`).
+3. **If detected**, the loop intercepts the response, blocks UI output, parses the arguments, and executes the designated JavaScript function.
+4. The result of the function execution is appended to the message array inside a `<tool_response>` block, and the generation is re-triggered automatically.
+5. **If no tool calls are detected**, the loop breaks, and the final response is displayed to the user.
+
+## 4. The Exact JSON Payload Structure
 
 The final array sent from the main thread to the Web Worker (`ai.worker.js`) — which is then passed directly into `Transformers.js` — follows the **ChatML instruction format** expected by the Qwen2.5 model family.
 
@@ -52,19 +69,23 @@ Here is the exact structure of the payload:
 [
   {
     "role": "system",
-    "content": "You are an offline coding assistant. Here is the relevant file context:\n--- File: script.py ---\nimport pandas as pd\n# ... (up to 1500 chars of code) ...\n\n--- File: data.xlsx (Excel Schema Snapshot) ---\n{\n  \"schema\": {\n    \"Employee\": \"object\",\n    \"Salary\": \"int64\"\n  },\n  \"preview_rows\": [\n    {\n      \"Employee\": \"Alice Smith\",\n      \"Salary\": 85000\n    }\n  ]\n}\n\n"
+    "content": "You are an offline coding assistant. Here is the relevant file context:\n--- File: script.py ---\nimport pandas as pd\n# ... (up to 1500 chars of code) ...\n\nYou have access to the following tools:\n<tools>\n[\n  {\n    \"name\": \"write_file\",\n    \"description\": \"Write content to a file in the workspace\",\n    \"parameters\": {\n      \"path\": {\"type\": \"string\", \"description\": \"Filename, e.g. script.py\"},\n      \"content\": {\"type\": \"string\"}\n    }\n  }\n]\n</tools>\nTo use a tool, output a tool call using the following XML format. Stop generating text immediately after the closing tag.\n<tool_call>\n{\"name\": \"tool_name\", \"args\": {\"arg_name\": \"arg_value\"}}\n</tool_call>"
   },
   {
     "role": "user",
-    "content": "Can you analyze this file?"
+    "content": "Write a hello world script to hello.py"
   },
   {
     "role": "assistant",
-    "content": "Sure, I can see it's a python script..."
+    "content": "<tool_call>{\"name\": \"write_file\", \"args\": {\"path\": \"hello.py\", \"content\": \"print('Hello World')\"}}</tool_call>"
   },
   {
-    "role": "user",
-    "content": "Write a python script to read it."
+    "role": "system",
+    "content": "<tool_response>Successfully wrote to hello.py</tool_response>"
+  },
+  {
+    "role": "assistant",
+    "content": "I have created the script for you!"
   }
 ]
 ```

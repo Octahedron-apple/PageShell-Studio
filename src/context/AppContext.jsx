@@ -176,6 +176,14 @@ button {
     );
   };
 
+  const generateCodeAsync = (messages, onToken) => {
+    return new Promise((resolve) => {
+      generateCode(messages, onToken, (fullOutput) => {
+        resolve(fullOutput);
+      });
+    });
+  };
+
   const handleQuery = async (queryText) => {
     if (loading || aiStreaming) return;
     setAiStreaming(true);
@@ -216,7 +224,32 @@ preview_excel()
       }
     }
 
-    const systemPrompt = `You are an offline coding assistant. Here is the relevant file context:\n${contextText}`;
+    const systemPrompt = `You are an offline coding assistant. Here is the relevant file context:\n${contextText}
+
+You have access to the following tools:
+<tools>
+[
+  {
+    "name": "write_file",
+    "description": "Write content to a file in the workspace",
+    "parameters": {
+      "path": {"type": "string", "description": "Filename, e.g. script.py"},
+      "content": {"type": "string"}
+    }
+  },
+  {
+    "name": "run_python",
+    "description": "Execute Python code in the Pyodide sandbox",
+    "parameters": {
+      "code": {"type": "string"}
+    }
+  }
+]
+</tools>
+To use a tool, output a tool call using the following XML format. Stop generating text immediately after the closing tag.
+<tool_call>
+{"name": "tool_name", "args": {"arg_name": "arg_value"}}
+</tool_call>`;
     const historyMessages = aiLogs
       .filter(log => log.sender === 'user' || log.sender === 'ai')
       .map(log => ({ role: log.sender === 'user' ? 'user' : 'assistant', content: log.text }));
@@ -227,19 +260,50 @@ preview_excel()
       { role: 'user', content: queryText }
     ];
 
-    setAiLogs(prev => [...prev, { sender: 'ai', text: '' }]);
-    generateCode(
-      requestMessages,
-      (token) => {
+    let currentMessages = requestMessages;
+
+    while (true) {
+      setAiLogs(prev => [...prev, { sender: 'ai', text: '' }]);
+      
+      const fullOutput = await generateCodeAsync(currentMessages, (token) => {
         setAiLogs(prev => {
           const next = [...prev];
           const last = next[next.length - 1];
           if (last?.sender === 'ai') next[next.length - 1] = { ...last, text: last.text + token };
           return next;
         });
-      },
-      () => setAiStreaming(false)
-    );
+      });
+
+      const toolCallMatch = fullOutput.match(/<tool_call>([\s\S]*?)<\/tool_call>/);
+      if (toolCallMatch) {
+        let result = '';
+        try {
+          const toolData = JSON.parse(toolCallMatch[1].trim());
+          if (toolData.name === 'write_file') {
+            await fileSystemAPI.writeFile(`workspace/${toolData.args.path}`, new TextEncoder().encode(toolData.args.content));
+            result = `Successfully wrote to ${toolData.args.path}`;
+            await refreshFiles();
+          } else if (toolData.name === 'run_python') {
+            const pyResult = await runPython(toolData.args.code);
+            result = `Python output: ${JSON.stringify(pyResult)}`;
+            await refreshFiles();
+          } else {
+            result = `Unknown tool: ${toolData.name}`;
+          }
+        } catch (err) {
+          result = `Error executing tool: ${err.message}`;
+        }
+        
+        currentMessages.push({ role: 'assistant', content: fullOutput });
+        currentMessages.push({ role: 'system', content: `<tool_response>\n${result}\n</tool_response>` });
+        
+        setAiLogs(prev => [...prev, { sender: 'ai', text: `\n\n🔧 Tool Result: ${result}\n\n` }]);
+      } else {
+        break;
+      }
+    }
+
+    setAiStreaming(false);
   };
 
   // --- Lifecycle ---
