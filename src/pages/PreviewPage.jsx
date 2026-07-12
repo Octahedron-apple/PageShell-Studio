@@ -10,8 +10,12 @@ export default function PreviewPage() {
     setLoading(true);
     try {
       const html = await fileSystemAPI.readFile('workspace/index.html').catch(() => '');
-      const css  = await fileSystemAPI.readFile('workspace/styles.css').catch(() => '');
-      const js   = await fileSystemAPI.readFile('workspace/script.js').catch(() => '');
+      let css  = await fileSystemAPI.readFile('workspace/styles.css').catch(() => '');
+      let js   = await fileSystemAPI.readFile('workspace/script.js').catch(() => '');
+
+      // Strip source map comments to suppress devtools warnings in about:srcdoc
+      css = css.replace(/\/\*# sourceMappingURL=.* \*\//g, '');
+      js = js.replace(/\/\/# sourceMappingURL=.*/g, '');
 
       setSrcDoc(`<!DOCTYPE html>
 <html>
@@ -21,7 +25,7 @@ export default function PreviewPage() {
   </head>
   <body>
     ${html}
-    <script>${js}<\/script>
+    <script type="module">${js}</script>
   </body>
 </html>`);
       setLoaded(true);

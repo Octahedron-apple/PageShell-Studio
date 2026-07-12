@@ -57,15 +57,6 @@ function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode
         onClick={handleClick}
         title={isDir ? (open ? 'Collapse' : 'Expand') : node.path}
       >
-        {onToggleSelect && !isDir && (
-          <input
-            type="checkbox"
-            checked={isSelected}
-            onChange={e => { e.stopPropagation(); onToggleSelect && onToggleSelect(node.path); }}
-            style={styles.checkbox}
-            onClick={e => e.stopPropagation()}
-          />
-        )}
         <span style={styles.arrow}>
           {isDir ? (open ? '▾' : '▸') : ''}
         </span>
@@ -75,6 +66,15 @@ function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode
         </span>
         {!isDir && (
           <span style={styles.badge}>{node.name.split('.').pop().toUpperCase()}</span>
+        )}
+        {onToggleSelect && !isDir && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={e => { e.stopPropagation(); onToggleSelect && onToggleSelect(node.path); }}
+            style={styles.checkbox}
+            onClick={e => e.stopPropagation()}
+          />
         )}
       </div>
       {isDir && open && node.children && node.children.map(child => (

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { fileSystemAPI } from '../services/fs/fileSystem.js';
 import { runPython, subscribePythonLogs } from '../services/runtimes/pyodide.js';
+import { runJS } from '../services/runtimes/quickjs.js';
 import { generateCode, subscribeAIStatus } from '../services/ai/models.js';
 import localforage from 'localforage';
 
@@ -14,6 +15,13 @@ export function AppProvider({ children }) {
   const [code, setCode] = useState('');
   const [activeFile, setActiveFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [runTarget, setRunTarget] = useState(null);
+
+  useEffect(() => {
+    if (activeFile && (activeFile.endsWith('.py') || activeFile.endsWith('.js'))) {
+      setRunTarget(activeFile);
+    }
+  }, [activeFile]);
 
   // --- File System State ---
   const [files, setFiles] = useState([]);
@@ -119,11 +127,31 @@ except Exception as e:
   // --- Actions ---
   const handleRun = async () => {
     setLoading(true);
-    setLogs(prev => [...prev, { type: 'info', text: 'Executing script in Pyodide sandbox...' }]);
+
+    if (!runTarget) {
+      setLogs(prev => [...prev, { type: 'stderr', text: 'No script selected to run.' }]);
+      setLoading(false);
+      return;
+    }
+
+    const isPy = runTarget.endsWith('.py');
+    const isJs = runTarget.endsWith('.js');
+    setLogs(prev => [...prev, { type: 'info', text: `Executing ${isPy ? 'Python' : 'JavaScript'} script (${runTarget.split('/').pop()}) in sandbox...` }]);
+    
     try {
-      const result = await runPython(code);
-      if (result !== undefined) {
-        setLogs(prev => [...prev, { type: 'success', text: `Execution completed. Return: ${JSON.stringify(result)}` }]);
+      const fileContent = await fileSystemAPI.readFile(runTarget);
+      if (isPy) {
+        const result = await runPython(fileContent);
+        if (result !== undefined) {
+          setLogs(prev => [...prev, { type: 'success', text: `Execution completed. Return: ${JSON.stringify(result)}` }]);
+        }
+      } else if (isJs) {
+        const result = await runJS(fileContent);
+        if (result !== undefined) {
+          setLogs(prev => [...prev, { type: 'success', text: `Execution completed. Return: ${JSON.stringify(result)}` }]);
+        }
+      } else {
+        setLogs(prev => [...prev, { type: 'stderr', text: `Unsupported file type for execution: ${runTarget}` }]);
       }
       await refreshFiles();
     } catch (err) {
@@ -455,6 +483,7 @@ To use a tool, output a tool call using the following XML format. Stop generatin
       code, setCode, activeFile, setActiveFile, loading,
       files, logs, setLogs,
       selectedFiles, aiLogs, setAiLogs, statusMessage, aiStreaming,
+      runTarget, setRunTarget,
       handleRun, handleUpload, handleOpenFile, handleSaveFile,
       handleToggleFileSelect, handleQuery, refreshFiles, handleAutocomplete,
     }}>

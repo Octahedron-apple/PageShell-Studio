@@ -1,9 +1,28 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import Terminal from '../components/Terminal.jsx';
 
+function getExecutableScripts(nodes) {
+  let scripts = [];
+  for (const node of nodes) {
+    if (node.type === 'directory' && node.children) {
+      scripts = scripts.concat(getExecutableScripts(node.children));
+    } else if (node.type === 'file' && (node.name.endsWith('.py') || node.name.endsWith('.js'))) {
+      scripts.push(node.path);
+    }
+  }
+  return scripts;
+}
+
 export default function RunPage() {
-  const { logs, setLogs, handleRun, loading } = useApp();
+  const { logs, setLogs, handleRun, loading, runTarget, setRunTarget, files } = useApp();
+  const scripts = getExecutableScripts(files);
+
+  useEffect(() => {
+    if (!runTarget && scripts.length > 0) {
+      setRunTarget(scripts[0]);
+    }
+  }, [scripts, runTarget, setRunTarget]);
 
   return (
     <div style={styles.container}>
@@ -12,17 +31,30 @@ export default function RunPage() {
           <span style={styles.icon}>▶️</span>
           <span style={styles.title}>Execution Runner</span>
         </div>
-        <button
-          onClick={handleRun}
-          disabled={loading}
-          style={{
-            ...styles.runButton,
-            ...(loading ? styles.runButtonLoading : {})
-          }}
-          id="run-page-btn"
-        >
-          {loading ? 'Running...' : 'Run Analysis (F5)'}
-        </button>
+        <div style={styles.actionArea}>
+          <select 
+            style={styles.select} 
+            value={runTarget || ''} 
+            onChange={(e) => setRunTarget(e.target.value)}
+            disabled={loading}
+          >
+            <option value="" disabled>Select a script to run</option>
+            {scripts.map(script => (
+              <option key={script} value={script}>{script.split('/').pop()}</option>
+            ))}
+          </select>
+          <button
+            onClick={handleRun}
+            disabled={loading || !runTarget}
+            style={{
+              ...styles.runButton,
+              ...(loading ? styles.runButtonLoading : {})
+            }}
+            id="run-page-btn"
+          >
+            {loading ? 'Running...' : 'Run (F5)'}
+          </button>
+        </div>
       </div>
       <div style={styles.terminalWrapper}>
         <Terminal logs={logs} onClear={() => setLogs([])} />
@@ -63,6 +95,21 @@ const styles = {
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
     color: '#a0aec0',
+  },
+  actionArea: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  select: {
+    backgroundColor: '#1a1a20',
+    color: '#e2e8f0',
+    border: '1px solid #2d3748',
+    borderRadius: '4px',
+    padding: '6px 10px',
+    fontSize: '13px',
+    outline: 'none',
+    cursor: 'pointer',
   },
   runButton: {
     backgroundColor: '#4facfe',
