@@ -5,7 +5,66 @@ import { env, pipeline, TextStreamer } from '@huggingface/transformers';
 // This avoids bundling weights into the deployment artifact, keeping CI fast.
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
-env.useBrowserCache = true;   // Caches weights in IndexedDB after first download
+env.useBrowserCache = false;   // Disabled due to browser Cache API .clone() out-of-memory bug
+
+// Implement a custom OPFS cache fetcher to bypass Cache API entirely
+env.customFetch = async (request, options) => {
+  const urlStr = typeof request === 'string' ? request : request.url;
+  
+  // Only intercept .onnx weight files
+  if (!urlStr.includes('huggingface.co') || !urlStr.endsWith('.onnx')) {
+    return fetch(request, options);
+  }
+
+  const filename = urlStr.split('/').pop();
+  let root;
+  try {
+    root = await navigator.storage.getDirectory();
+    const fileHandle = await root.getFileHandle(filename);
+    const file = await fileHandle.getFile();
+    if (file.size > 0) {
+      self.postMessage({ type: 'STATUS', message: `Loaded ${filename} from local OPFS cache.` });
+      return new Response(file);
+    }
+  } catch (e) {
+    // File not found in OPFS, proceed to fetch
+  }
+
+  const response = await fetch(request, options);
+  if (!response.ok || !root) return response;
+
+  // Stream directly to OPFS while serving to transformers.js
+  const reader = response.body.getReader();
+  const fileHandle = await root.getFileHandle(filename, { create: true });
+  const accessHandle = await fileHandle.createSyncAccessHandle();
+  
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            accessHandle.flush();
+            accessHandle.close();
+            controller.close();
+            break;
+          }
+          accessHandle.write(value);
+          controller.enqueue(value);
+        }
+      } catch (err) {
+        accessHandle.close();
+        controller.error(err);
+      }
+    }
+  });
+
+  return new Response(stream, {
+    headers: response.headers,
+    status: response.status,
+    statusText: response.statusText
+  });
+};
 
 // Disable nested proxy workers — we are already running inside a Web Worker
 env.backends.onnx.wasm.proxy = false;
