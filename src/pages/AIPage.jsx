@@ -20,6 +20,7 @@ export default function AIPage() {
           selectedFiles={selectedFiles}
           onToggleSelect={handleToggleFileSelect}
           onOpenFile={handleOpenFile}
+          mode="ai"
         />
       </aside>
 

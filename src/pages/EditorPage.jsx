@@ -22,6 +22,7 @@ export default function EditorPage() {
           selectedFiles={selectedFiles}
           onToggleSelect={handleToggleFileSelect}
           onOpenFile={handleOpenFile}
+          mode="editor"
         />
       </aside>
 

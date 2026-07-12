@@ -1,8 +1,8 @@
 import { env, pipeline, TextStreamer } from '@huggingface/transformers';
 
 // Load model from HuggingFace Hub — downloaded once and cached in IndexedDB.
-// This avoids bundling 70MB+ of weights into the GitHub Pages deployment artifact,
-// keeping CI fast and deployments small.
+// Model: onnx-community/Qwen2.5-Coder-1.5B-Instruct (q4, ~900MB on first load)
+// This avoids bundling weights into the deployment artifact, keeping CI fast.
 env.allowLocalModels = false;
 env.allowRemoteModels = true;
 env.useBrowserCache = true;   // Caches weights in IndexedDB after first download
@@ -34,18 +34,18 @@ async function checkWebGPUSupport() {
 
 async function getPipeline() {
   if (!tgPipeline) {
-    // Use the official HuggingFace Hub model ID — weights download on first use.
-    const modelId = 'onnx-community/SmolLM2-135M-Instruct-ONNX';
+    // Qwen2.5-Coder-1.5B-Instruct — code-tuned, ONNX q4, ~900MB cached after first load.
+    const modelId = 'onnx-community/Qwen2.5-Coder-1.5B-Instruct';
     const isWebGPUSupported = await checkWebGPUSupport();
 
     if (isWebGPUSupported) {
       try {
-        self.postMessage({ type: 'STATUS', message: 'Initializing pipeline with WebGPU acceleration...' });
+        self.postMessage({ type: 'STATUS', message: 'Initializing Qwen2.5-Coder with WebGPU acceleration...' });
         tgPipeline = await pipeline('text-generation', modelId, {
-          device: 'webgpu',          // Force WebGPU acceleration
-          dtype: 'q4',               // Load the highly efficient 4-bit quantized version
+          device: 'webgpu',
+          dtype: 'q4',
         });
-        self.postMessage({ type: 'STATUS', message: 'Model loaded successfully using WebGPU!' });
+        self.postMessage({ type: 'STATUS', message: 'Qwen2.5-Coder loaded with WebGPU!' });
         return tgPipeline;
       } catch (gpuError) {
         console.warn('WebGPU failed to initialize despite API support. Falling back to WASM:', gpuError);
@@ -54,12 +54,12 @@ async function getPipeline() {
       self.postMessage({ type: 'STATUS', message: 'WebGPU is not supported in this browser environment. Using WASM fallback...' });
     }
 
-    self.postMessage({ type: 'STATUS', message: 'Initializing pipeline with WASM (CPU) execution...' });
+    self.postMessage({ type: 'STATUS', message: 'Initializing Qwen2.5-Coder with WASM (CPU)...' });
     tgPipeline = await pipeline('text-generation', modelId, {
-      device: 'wasm',            // Fallback to WASM execution
-      dtype: 'q4',               // Load the 4-bit quantized version
+      device: 'wasm',
+      dtype: 'q4',
     });
-    self.postMessage({ type: 'STATUS', message: 'Model loaded successfully using WASM (CPU fallback).' });
+    self.postMessage({ type: 'STATUS', message: 'Qwen2.5-Coder loaded with WASM (CPU fallback).' });
   }
   return tgPipeline;
 }
