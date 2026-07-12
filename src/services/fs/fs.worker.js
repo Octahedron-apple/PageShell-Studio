@@ -49,6 +49,21 @@ self.onmessage = async (event) => {
 
       self.postMessage({ txId, type: 'SUCCESS', data: textContent });
     }
+    if (action === 'READ_FILE_BINARY') {
+      const fileHandle = await getFileHandleRecursive(root, filePath);
+      const accessHandle = await fileHandle.createSyncAccessHandle();
+      
+      let readBuffer;
+      try {
+        const fileSize = accessHandle.getSize();
+        readBuffer = new Uint8Array(fileSize);
+        accessHandle.read(readBuffer, { at: 0 });
+      } finally {
+        accessHandle.close();
+      }
+
+      self.postMessage({ txId, type: 'SUCCESS', data: readBuffer });
+    }
     
     if (action === 'GET_TREE') {
       // Utility loop to map out the current directory layout tree for the UI

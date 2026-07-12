@@ -7,6 +7,7 @@ import AIPage from './pages/AIPage.jsx';
 import FSPage from './pages/FSPage.jsx';
 import RunPage from './pages/RunPage.jsx';
 import PreviewPage from './pages/PreviewPage.jsx';
+import DocumentsPage from './pages/DocumentsPage.jsx';
 
 import Editor from './components/Editor.jsx';
 
@@ -38,6 +39,7 @@ export default function App() {
               <Route path="/" element={<Navigate to="/editor" replace />} />
               <Route path="/fs" element={<FSPage />} />
               <Route path="/editor" element={<EditorPageWrapper />} />
+              <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/run" element={<RunPage />} />
               <Route path="/preview" element={<PreviewPage />} />
               <Route path="/ai" element={<AIPage />} />

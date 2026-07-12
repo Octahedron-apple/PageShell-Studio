@@ -7,37 +7,64 @@ env.allowLocalModels = false;
 env.allowRemoteModels = true;
 env.useBrowserCache = false;   // Disabled due to browser Cache API .clone() out-of-memory bug
 
-// Implement a custom OPFS cache fetcher to bypass Cache API entirely
+// Custom OPFS cache: bypasses Cache API (which crashes on large files due to OOM clone bug).
+// Uses a .meta sidecar file to mark downloads as complete — prevents serving partial files on refresh.
 env.customFetch = async (request, options) => {
   const urlStr = typeof request === 'string' ? request : request.url;
-  
-  // Only intercept .onnx weight files
-  if (!urlStr.includes('huggingface.co') || !urlStr.endsWith('.onnx')) {
+
+  // Intercept any HuggingFace large model file (handle query params & CDN redirects)
+  const isModelFile = urlStr.includes('.onnx') || urlStr.includes('.bin');
+  if (!isModelFile) {
     return fetch(request, options);
   }
 
-  const filename = urlStr.split('/').pop();
-  let root;
+  // Derive a stable cache key from the URL path, stripping query strings
+  const filename = urlStr.split('/').pop().split('?')[0];
+  const metaKey  = filename + '.meta';
+
+  let cacheDir;
   try {
-    root = await navigator.storage.getDirectory();
-    const fileHandle = await root.getFileHandle(filename);
-    const file = await fileHandle.getFile();
-    if (file.size > 0) {
-      self.postMessage({ type: 'STATUS', message: `Loaded ${filename} from local OPFS cache.` });
-      return new Response(file);
+    const root = await navigator.storage.getDirectory();
+    cacheDir = await root.getDirectoryHandle('ai_model_cache', { create: true });
+
+    // Validate cache: only serve if the .meta file says download is complete
+    try {
+      const metaHandle = await cacheDir.getFileHandle(metaKey);
+      const metaFile   = await metaHandle.getFile();
+      const meta       = JSON.parse(await metaFile.text());
+
+      if (meta.complete) {
+        const fileHandle = await cacheDir.getFileHandle(filename);
+        const file       = await fileHandle.getFile();
+        if (file.size === meta.size) {
+          self.postMessage({ type: 'STATUS', message: `Cache hit: ${filename} (${(meta.size / 1e6).toFixed(0)} MB)` });
+          return new Response(file, { headers: { 'Content-Type': 'application/octet-stream' } });
+        }
+        // Size mismatch — stale/corrupt entry, fall through to re-download
+        console.warn(`[AI Cache] Stale cache for ${filename}, re-downloading...`);
+      }
+    } catch (_) {
+      // .meta not found — first download
     }
-  } catch (e) {
-    // File not found in OPFS, proceed to fetch
+  } catch (_) {
+    // OPFS unavailable — fall through to plain fetch
+    return fetch(request, options);
   }
 
+  // --- Network fetch + simultaneous OPFS stream write ---
   const response = await fetch(request, options);
-  if (!response.ok || !root) return response;
+  if (!response.ok) return response;
 
-  // Stream directly to OPFS while serving to transformers.js
-  const reader = response.body.getReader();
-  const fileHandle = await root.getFileHandle(filename, { create: true });
+  const contentLength = parseInt(response.headers.get('Content-Length') || '0', 10);
+  const reader        = response.body.getReader();
+
+  // Pre-create the OPFS handle before the stream starts
+  const fileHandle   = await cacheDir.getFileHandle(filename, { create: true });
   const accessHandle = await fileHandle.createSyncAccessHandle();
-  
+  accessHandle.truncate(0); // clear any partial content from a previous failed attempt
+
+  let bytesWritten = 0;
+
   const stream = new ReadableStream({
     async start(controller) {
       try {
@@ -46,10 +73,28 @@ env.customFetch = async (request, options) => {
           if (done) {
             accessHandle.flush();
             accessHandle.close();
+
+            // Only write .meta when we received the full file
+            const isComplete = contentLength === 0 || bytesWritten >= contentLength;
+            if (isComplete) {
+              try {
+                const metaHandle   = await cacheDir.getFileHandle(metaKey, { create: true });
+                const metaAccess   = await metaHandle.createSyncAccessHandle();
+                const metaPayload  = new TextEncoder().encode(JSON.stringify({ size: bytesWritten, complete: true }));
+                metaAccess.truncate(0);
+                metaAccess.write(metaPayload, { at: 0 });
+                metaAccess.flush();
+                metaAccess.close();
+                self.postMessage({ type: 'STATUS', message: `Cached ${filename} to OPFS (${(bytesWritten / 1e6).toFixed(0)} MB).` });
+              } catch (metaErr) {
+                console.warn('[AI Cache] Failed to write .meta:', metaErr);
+              }
+            }
             controller.close();
             break;
           }
           accessHandle.write(value);
+          bytesWritten += value.byteLength;
           controller.enqueue(value);
         }
       } catch (err) {
@@ -62,9 +107,10 @@ env.customFetch = async (request, options) => {
   return new Response(stream, {
     headers: response.headers,
     status: response.status,
-    statusText: response.statusText
+    statusText: response.statusText,
   });
 };
+
 
 // Disable nested proxy workers — we are already running inside a Web Worker
 env.backends.onnx.wasm.proxy = false;
