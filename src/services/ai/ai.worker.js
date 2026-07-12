@@ -3,7 +3,7 @@ import { fileSystemAPI } from '../fs/fileSystem.js';
 
 let generator = null;
 let modelLoading = false;
-const MODEL_ID = 'Qwen/Qwen2.5-Coder-0.5B-Instruct';
+const MODEL_ID = 'onnx-community/Qwen2.5-Coder-0.5B-Instruct';
 
 env.useBrowserCache = false;
 
@@ -35,16 +35,20 @@ env.customFetch = async function(url, options) {
     const contentType = res.headers.get('Content-Type') || 'application/octet-stream';
     const contentLength = res.headers.get('Content-Length') || '0';
 
-    try {
-      const encoder = new TextEncoder();
-      const metaStr = JSON.stringify({ type: contentType, size: parseInt(contentLength, 10) });
-      await fileSystemAPI.writeFile(metaPath, encoder.encode(metaStr));
+    // Perform OPFS caching asynchronously so transformers.js receives the 
+    // network stream immediately for progress tracking and compilation.
+    (async () => {
+      try {
+        const encoder = new TextEncoder();
+        const metaStr = JSON.stringify({ type: contentType, size: parseInt(contentLength, 10) });
+        await fileSystemAPI.writeFile(metaPath, encoder.encode(metaStr));
 
-      const arrayBuffer = await resClone.arrayBuffer();
-      await fileSystemAPI.writeFile(opfsPath, new Uint8Array(arrayBuffer));
-    } catch(e) {
-      console.warn("Failed to cache model file in OPFS:", e);
-    }
+        const arrayBuffer = await resClone.arrayBuffer();
+        await fileSystemAPI.writeFile(opfsPath, new Uint8Array(arrayBuffer));
+      } catch(e) {
+        console.warn("Failed to cache model file in OPFS:", e);
+      }
+    })();
     
     return res;
   } catch (error) {
