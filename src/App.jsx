@@ -4,57 +4,25 @@ import { AppProvider, useApp } from './context/AppContext.jsx';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 import Sidebar from './components/Sidebar.jsx';
 import AIPage from './pages/AIPage.jsx';
-import FileManager from './components/FileManager.jsx';
-import Editor from './components/Editor.jsx';
-import Terminal from './components/Terminal.jsx';
+import FSPage from './pages/FSPage.jsx';
+import RunPage from './pages/RunPage.jsx';
 import PreviewPage from './pages/PreviewPage.jsx';
 
-function Workspace() {
-  const {
-    code, setCode, activeFile, loading,
-    files, logs, setLogs,
-    handleRun, handleUpload, handleOpenFile, handleSaveFile,
-    selectedFiles, handleToggleFileSelect,
-  } = useApp();
+import Editor from './components/Editor.jsx';
 
-  return (
-    <div style={styles.workspace}>
-      <Group direction="horizontal">
-        {/* Left Column: File Manager */}
-        <Panel defaultSize={25} minSize={15} style={styles.panelColumn}>
-          <FileManager
-            files={files}
-            onUpload={handleUpload}
-            selectedFiles={selectedFiles}
-            onToggleSelect={handleToggleFileSelect}
-            onOpenFile={handleOpenFile}
-            mode="editor"
-          />
-        </Panel>
-
-        <Separator className="resize-handle" />
-
-        {/* Right Column: Editor */}
-        <Panel defaultSize={75} minSize={20} style={styles.panelColumn}>
-          <Editor
-            code={code}
-            activeFile={activeFile}
-            onChange={setCode}
-            onRun={handleRun}
-            onSave={handleSaveFile}
-            loading={loading}
-          />
-        </Panel>
-      </Group>
-    </div>
-  );
-}
-
-function TerminalTab() {
-  const { logs, setLogs } = useApp();
+function EditorPageWrapper() {
+  const { code, setCode, activeFile, loading, handleRun, handleSaveFile } = useApp();
+  
   return (
     <div style={{ width: '100%', height: '100%' }}>
-      <Terminal logs={logs} onClear={() => setLogs([])} />
+      <Editor
+        code={code}
+        activeFile={activeFile}
+        onChange={setCode}
+        onRun={handleRun}
+        onSave={handleSaveFile}
+        loading={loading}
+      />
     </div>
   );
 }
@@ -68,9 +36,10 @@ export default function App() {
           <div style={styles.content}>
             <Routes>
               <Route path="/" element={<Navigate to="/editor" replace />} />
-              <Route path="/editor" element={<Workspace />} />
+              <Route path="/fs" element={<FSPage />} />
+              <Route path="/editor" element={<EditorPageWrapper />} />
+              <Route path="/run" element={<RunPage />} />
               <Route path="/preview" element={<PreviewPage />} />
-              <Route path="/terminal" element={<TerminalTab />} />
               <Route path="/ai" element={<AIPage />} />
             </Routes>
           </div>

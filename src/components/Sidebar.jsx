@@ -4,9 +4,10 @@ import { NavLink } from 'react-router-dom';
 const BASE = import.meta.env.BASE_URL;
 
 const navItems = [
+  { to: '/fs', icon: '📁', label: 'FS' },
   { to: '/editor', icon: '💻', label: 'Editor' },
+  { to: '/run', icon: '▶️', label: 'Run' },
   { to: '/preview', icon: '🌐', label: 'Preview' },
-  { to: '/terminal', icon: '🖥️', label: 'Terminal' },
   { to: '/ai',      icon: '🤖', label: 'AI' },
 ];
 

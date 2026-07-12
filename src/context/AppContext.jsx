@@ -318,8 +318,10 @@ To use a tool, output a tool call using the following XML format. Stop generatin
       try {
         const savedFile = await localforage.getItem('activeFile');
         const savedCode = await localforage.getItem('code');
+        const savedLogs = await localforage.getItem('logs');
         if (savedFile) setActiveFile(savedFile);
         if (savedCode) setCode(savedCode);
+        if (savedLogs) setLogs(savedLogs);
       } catch (err) {
         console.error('Failed to hydrate state from localforage:', err);
       }
@@ -342,6 +344,11 @@ To use a tool, output a tool call using the following XML format. Stop generatin
       localforage.setItem('code', code).catch(console.error);
     }
   }, [code]);
+
+  // Sync logs to localforage
+  useEffect(() => {
+    localforage.setItem('logs', logs).catch(console.error);
+  }, [logs]);
 
   // Global F5 Capture
   const handleRunRef = useRef(handleRun);

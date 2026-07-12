@@ -98,17 +98,7 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
           <span style={styles.editorIcon}>📝</span>
           <span style={styles.title}>{activeFile ? activeFile.split('/').pop() : 'Editor'}</span>
         </div>
-        <button
-          onClick={onRun}
-          disabled={loading}
-          style={{
-            ...styles.runButton,
-            ...(loading ? styles.runButtonLoading : {})
-          }}
-          id="editor-run-btn"
-        >
-          {loading ? 'Running...' : 'Run Analysis (F5)'}
-        </button>
+
       </div>
       <div 
         ref={editorContainerRef}

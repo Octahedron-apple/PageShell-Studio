@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import AIAssistant from '../components/AIAssistant.jsx';
-import FileManager from '../components/FileManager.jsx';
+
 
 export default function AIPage() {
   const {
@@ -12,18 +12,6 @@ export default function AIPage() {
 
   return (
     <div style={styles.page}>
-      {/* Left: File context picker */}
-      <aside style={styles.filePane}>
-        <FileManager
-          files={files}
-          onUpload={handleUpload}
-          selectedFiles={selectedFiles}
-          onToggleSelect={handleToggleFileSelect}
-          onOpenFile={handleOpenFile}
-          mode="ai"
-        />
-      </aside>
-
       {/* Right: Full-width AI chat */}
       <main style={styles.aiPane}>
         <AIAssistant
@@ -45,13 +33,7 @@ const styles = {
     height: '100%',
     overflow: 'hidden',
   },
-  filePane: {
-    width: '280px',
-    flexShrink: 0,
-    borderRight: '1px solid #222228',
-    backgroundColor: '#121215',
-    overflowY: 'auto',
-  },
+
   aiPane: {
     flex: 1,
     overflow: 'hidden',
