@@ -1,141 +1,68 @@
-import { pipeline, env, TextStreamer } from '@huggingface/transformers';
-import { fileSystemAPI } from '../fs/fileSystem.js';
+import { CreateMLCEngine } from '@mlc-ai/web-llm';
 
-let generator = null;
-let modelLoading = false;
-const MODEL_ID = 'onnx-community/Qwen2.5-Coder-0.5B-Instruct';
+let engine = null;
 
-env.useBrowserCache = false;
+// Using a lightweight coder model available in WebLLM's prebuilt registry.
+const modelId = "Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC";
 
-// Custom OPFS Fetcher to bypass Cache API clone memory issues
-env.customFetch = async function(url, options) {
-  const opfsPath = `workspace/.cache/${new URL(url).pathname.replace(/^\/+/, '').replace(/\//g, '_')}`;
-  const metaPath = `${opfsPath}.meta`;
-  
-  try {
+async function getEngine() {
+  if (!engine) {
+    self.postMessage({ type: 'STATUS', message: 'Initializing WebLLM WebGPU Engine...' });
+
+    const initProgressCallback = (progress) => {
+      // progress.progress is a float from 0 to 1
+      const pct = Math.round(progress.progress * 100);
+      self.postMessage({
+        type: 'STATUS',
+        message: `Loading model: ${pct}% - ${progress.text}`
+      });
+    };
+
     try {
-      const metaStr = await fileSystemAPI.readFile(metaPath);
-      const meta = JSON.parse(metaStr);
-      const content = await fileSystemAPI.readFile(opfsPath, true); // read binary
-      if (content && content.length === meta.size) {
-        return new Response(content, {
-          status: 200,
-          headers: {
-            'Content-Type': meta.type || 'application/octet-stream',
-            'Content-Length': meta.size.toString()
-          }
-        });
-      }
-    } catch(e) { }
-
-    const res = await fetch(url, options);
-    if (!res.ok) return res;
-
-    const resClone = res.clone();
-    const contentType = res.headers.get('Content-Type') || 'application/octet-stream';
-    const contentLength = res.headers.get('Content-Length') || '0';
-
-    // Perform OPFS caching asynchronously so transformers.js receives the 
-    // network stream immediately for progress tracking and compilation.
-    (async () => {
-      try {
-        const encoder = new TextEncoder();
-        const metaStr = JSON.stringify({ type: contentType, size: parseInt(contentLength, 10) });
-        await fileSystemAPI.writeFile(metaPath, encoder.encode(metaStr));
-
-        const arrayBuffer = await resClone.arrayBuffer();
-        await fileSystemAPI.writeFile(opfsPath, new Uint8Array(arrayBuffer));
-      } catch(e) {
-        console.warn("Failed to cache model file in OPFS:", e);
-      }
-    })();
-    
-    return res;
-  } catch (error) {
-    console.error(`Custom fetch failed for ${url}`, error);
-    throw error;
-  }
-};
-
-async function getGenerator() {
-  if (generator) return generator;
-  if (modelLoading) {
-    while (modelLoading) await new Promise(r => setTimeout(r, 100));
-    return generator;
-  }
-
-  modelLoading = true;
-  self.postMessage({ type: 'STATUS', message: 'Initializing transformers.js pipeline...' });
-
-  const progressCallback = (info) => {
-    if (info.status === 'progress') {
-      self.postMessage({ type: 'STATUS', message: `Loading: ${info.file} - ${Math.round(info.progress)}%` });
+      engine = await CreateMLCEngine(
+        modelId,
+        { initProgressCallback }
+      );
+      self.postMessage({ type: 'STATUS', message: 'Model ready with WebGPU acceleration!' });
+    } catch (e) {
+      console.error("Failed to initialize WebLLM:", e);
+      self.postMessage({ type: 'ERROR', error: `WebGPU Initialization failed: ${e.message}` });
+      throw e;
     }
-  };
-
-  try {
-    let device = 'wasm';
-    if (navigator.gpu) {
-      try {
-        const adapter = await navigator.gpu.requestAdapter();
-        if (adapter) device = 'webgpu';
-      } catch (e) { }
-    }
-    
-    if (device === 'wasm') {
-      env.backends.onnx.wasm.proxy = false;
-      env.backends.onnx.wasm.numThreads = 1;
-      self.postMessage({ type: 'STATUS', message: 'WebGPU not supported. Using WASM fallback (CPU)...' });
-    } else {
-      self.postMessage({ type: 'STATUS', message: 'WebGPU supported! Initializing hardware acceleration...' });
-    }
-
-    generator = await pipeline('text-generation', MODEL_ID, {
-      device: device,
-      progress_callback: progressCallback,
-      dtype: 'q4',
-    });
-
-    self.postMessage({ type: 'STATUS', message: `Model loaded on ${device.toUpperCase()}!` });
-  } catch (error) {
-    self.postMessage({ type: 'ERROR', error: error.message });
-    throw error;
-  } finally {
-    modelLoading = false;
   }
-  return generator;
+  return engine;
 }
 
 self.onmessage = async (e) => {
   const { action, prompt } = e.data;
+
   if (action === 'GENERATE') {
     try {
-      const gen = await getGenerator();
-      const messages = Array.isArray(prompt) ? prompt : [{ role: 'user', content: prompt }];
-      
-      const text = gen.tokenizer.apply_chat_template(messages, {
-        tokenize: false,
-        add_generation_prompt: true,
-      });
+      const eng = await getEngine();
 
-      const streamer = new TextStreamer(gen.tokenizer, {
-        skip_prompt: true,
-        callback_function: (output) => {
-          self.postMessage({ type: 'TOKEN', token: output });
-        }
-      });
+      const messages = Array.isArray(prompt) ? prompt : [
+        { role: 'user', content: prompt }
+      ];
 
-      const result = await gen(text, {
-        max_new_tokens: 512,
+      const chunks = await eng.chat.completions.create({
+        messages,
         temperature: 0.3,
-        streamer: streamer,
+        stream: true,
       });
 
-      // Result[0].generated_text already has the prompt included sometimes,
-      // but the streamer handles the clean delta sending.
-      self.postMessage({ type: 'COMPLETE', output: "Generation finished." });
-      
+      let finalOutput = '';
+      for await (const chunk of chunks) {
+        const token = chunk.choices[0]?.delta?.content || '';
+        finalOutput += token;
+        // Stream token to main thread
+        self.postMessage({ type: 'TOKEN', token });
+      }
+
+      // Signal completion
+      self.postMessage({ type: 'COMPLETE', output: finalOutput });
+
     } catch (err) {
+      console.error('Error during generation:', err);
       self.postMessage({ type: 'ERROR', error: err.message });
     }
   }
