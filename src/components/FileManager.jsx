@@ -51,7 +51,7 @@ function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode
         onClick={handleClick}
         title={isDir ? (open ? 'Collapse' : 'Expand') : node.path}
       >
-        {mode === 'ai' && !isDir && (
+        {onToggleSelect && !isDir && (
           <input
             type="checkbox"
             checked={isSelected}
@@ -131,7 +131,7 @@ export default function FileManager({ files, onUpload, selectedFiles = [], onTog
         )}
       </div>
 
-      {mode === 'ai' && (
+      {onToggleSelect && (
         <div style={styles.contextHint}>
           ☑ Check files to include as AI context
         </div>
