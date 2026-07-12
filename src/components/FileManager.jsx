@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 
 const BINARY_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'xlsx', 'xls', 'whl', 'wasm', 'mp4', 'webp'];
 const TEXT_EXTS   = ['html', 'css', 'js', 'py', 'json', 'md', 'txt', 'csv'];
+const VIEWER_EXTS = ['pdf', 'docx', 'xlsx', 'xls'];
 
 function getIcon(name, isDir) {
   if (isDir) return '📁';
@@ -21,6 +22,11 @@ function canOpenInEditor(name) {
   return TEXT_EXTS.includes(ext);
 }
 
+function canOpenInViewer(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  return VIEWER_EXTS.includes(ext);
+}
+
 function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode }) {
   const [open, setOpen] = useState(true);
   const isDir = node.type === 'directory';
@@ -28,14 +34,14 @@ function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode
   const handleClick = () => {
     if (isDir) {
       setOpen(o => !o);
-    } else if (mode === 'editor' && canOpenInEditor(node.name)) {
+    } else if (mode === 'editor' && (canOpenInEditor(node.name) || canOpenInViewer(node.name))) {
       onOpenFile && onOpenFile(node.path);
     }
   };
 
   const indent = depth * 16;
   const isSelected = !isDir && selectedFiles?.includes(node.path);
-  const isEditable = !isDir && canOpenInEditor(node.name);
+  const isEditable = !isDir && (canOpenInEditor(node.name) || canOpenInViewer(node.name));
 
   return (
     <>
@@ -88,12 +94,42 @@ function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode
 
 export default function FileManager({ files, onUpload, selectedFiles = [], onToggleSelect, onOpenFile, mode = 'editor' }) {
   const uploadRef = useRef(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   // files is an array of top-level nodes inside "workspace"
   const nodes = files || [];
 
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      for (let i = 0; i < e.dataTransfer.files.length; i++) {
+        onUpload?.(e.dataTransfer.files[i]);
+      }
+    }
+  };
+
   return (
-    <div style={styles.container}>
+    <div 
+      style={{
+        ...styles.container,
+        backgroundColor: isDragging ? '#1a1a24' : '#0d0d10',
+        border: isDragging ? '2px dashed #4facfe' : '2px solid transparent'
+      }}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {/* Header */}
       <div style={styles.header}>
         <span style={styles.headerTitle}>📁 Files</span>

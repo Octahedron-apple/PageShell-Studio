@@ -147,15 +147,28 @@ except Exception as e:
 
   const handleOpenFile = async (filePath) => {
     const ext = filePath.split('.').pop().toLowerCase();
-    if (['png', 'jpg', 'jpeg', 'gif', 'xlsx', 'xls', 'whl', 'wasm'].includes(ext)) {
+    
+    // Explicitly reject non-renderable media binaries
+    if (['png', 'jpg', 'jpeg', 'gif', 'whl', 'wasm', 'mp4', 'webp'].includes(ext)) {
       setLogs(prev => [...prev, { type: 'stderr', text: `Cannot open binary file ${filePath} in editor.` }]);
       return;
     }
+
     try {
+      // If it's a document format, just set active file and route to the docs viewer
+      if (['pdf', 'docx', 'xlsx', 'xls'].includes(ext)) {
+        setActiveFile(filePath);
+        setLogs(prev => [...prev, { type: 'info', text: `Opening ${filePath} in Documents viewer.` }]);
+        window.location.hash = '#/documents';
+        return;
+      }
+
+      // Otherwise, assume it's text and load into the editor
       const content = await fileSystemAPI.readFile(filePath);
       setCode(content);
       setActiveFile(filePath);
       setLogs(prev => [...prev, { type: 'info', text: `Opened ${filePath} in editor.` }]);
+      window.location.hash = '#/editor';
     } catch (err) {
       setLogs(prev => [...prev, { type: 'stderr', text: `Failed to open file: ${err.message}` }]);
     }

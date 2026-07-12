@@ -12,8 +12,8 @@ env.useBrowserCache = false;   // Disabled due to browser Cache API .clone() out
 env.customFetch = async (request, options) => {
   const urlStr = typeof request === 'string' ? request : request.url;
 
-  // Intercept any HuggingFace large model file (handle query params & CDN redirects)
-  const isModelFile = urlStr.includes('.onnx') || urlStr.includes('.bin');
+  // Intercept all HuggingFace model files including weights, configs, and tokenizers
+  const isModelFile = urlStr.match(/\.(onnx|bin|json|txt|msgpack)(\?|$)/i);
   if (!isModelFile) {
     return fetch(request, options);
   }

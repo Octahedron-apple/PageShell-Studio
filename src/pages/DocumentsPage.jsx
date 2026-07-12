@@ -12,6 +12,7 @@ export default function DocumentsPage() {
   const [fileType, setFileType] = useState(null); // 'text', 'sheet', 'docx', 'unsupported'
   const [loading, setLoading] = useState(false);
   const viewerRef = useRef(null);
+  const objectUrlRef = useRef(null);
 
   useEffect(() => {
     if (!activeFile) {
@@ -20,6 +21,13 @@ export default function DocumentsPage() {
       return;
     }
     loadDocument(activeFile);
+
+    return () => {
+      if (objectUrlRef.current) {
+        URL.revokeObjectURL(objectUrlRef.current);
+        objectUrlRef.current = null;
+      }
+    };
   }, [activeFile]);
 
   const loadDocument = async (filePath) => {
@@ -42,6 +50,17 @@ export default function DocumentsPage() {
         setContent(result.value);
         setFileType('docx');
       } 
+      else if (ext === 'pdf') {
+        const buffer = await fileSystemAPI.readFileBinary(filePath);
+        const blob = new Blob([buffer], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        if (objectUrlRef.current) {
+          URL.revokeObjectURL(objectUrlRef.current);
+        }
+        objectUrlRef.current = url;
+        setContent(url);
+        setFileType('pdf');
+      }
       else if (['png', 'jpg', 'jpeg', 'gif', 'wasm', 'mp4', 'webp', 'whl'].includes(ext)) {
         setContent('Binary media files cannot be viewed in the Documents tab.');
         setFileType('unsupported');
@@ -158,6 +177,12 @@ export default function DocumentsPage() {
           <div 
             style={styles.richText} 
             dangerouslySetInnerHTML={{ __html: content }} 
+          />
+        ) : fileType === 'pdf' ? (
+          <iframe 
+            src={content} 
+            title="PDF Viewer"
+            style={{ width: '100%', height: '100%', border: 'none' }} 
           />
         ) : fileType === 'text' ? (
           <pre style={styles.preText}>{content}</pre>
