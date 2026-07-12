@@ -39,13 +39,19 @@ export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLog
         )}
       </div>
 
-      {/* Status Bar */}
-      {statusMessage && (
-        <div style={styles.statusBar}>
-          <span style={styles.statusDot}></span>
-          <span style={styles.statusText}>{statusMessage}</span>
-        </div>
-      )}
+      {/* Status Bar — always visible, highlighted during downloads */}
+      {(() => {
+        const isDownloading = statusMessage && statusMessage.includes('Downloading');
+        return (
+          <div style={{ ...styles.statusBar, ...(isDownloading ? styles.statusBarActive : {}) }}>
+            <span style={{ ...styles.statusDot, ...(isDownloading ? styles.statusDotActive : {}) }} />
+            <span style={styles.statusText}>{statusMessage || 'AI worker offline. Send a query to load the model.'}</span>
+            {isDownloading && (
+              <span style={styles.downloadingBadge}>↓ Downloading</span>
+            )}
+          </div>
+        );
+      })()}
 
       {/* AI Log Output */}
       <div style={styles.chatArea} id="ai-chat-body">
@@ -163,20 +169,45 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '6px 16px',
+    padding: '7px 16px',
     backgroundColor: '#0c0c0e',
     borderBottom: '1px solid #222228',
-    fontSize: '11px'
+    fontSize: '11px',
+    transition: 'background-color 0.3s',
+    flexShrink: 0,
+  },
+  statusBarActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.08)',
+    borderBottom: '1px solid rgba(245, 158, 11, 0.25)',
   },
   statusDot: {
     width: '6px',
     height: '6px',
     borderRadius: '50%',
     backgroundColor: '#3498db',
-    boxShadow: '0 0 6px #3498db'
+    boxShadow: '0 0 6px #3498db',
+    flexShrink: 0,
+  },
+  statusDotActive: {
+    backgroundColor: '#f59e0b',
+    boxShadow: '0 0 8px #f59e0b',
   },
   statusText: {
-    color: '#718096'
+    color: '#718096',
+    flex: 1,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  downloadingBadge: {
+    fontSize: '10px',
+    fontWeight: '700',
+    color: '#f59e0b',
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    border: '1px solid rgba(245, 158, 11, 0.3)',
+    padding: '2px 7px',
+    borderRadius: '10px',
+    flexShrink: 0,
   },
   chatArea: {
     flex: 1,

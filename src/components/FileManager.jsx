@@ -84,6 +84,8 @@ const styles = {
     flex: 1,
     overflow: 'auto',
     minHeight: 0,
+    colorScheme: 'light',
+    backgroundColor: '#fff',
   },
   bottomPanel: {
     borderTop: '1px solid #222228',

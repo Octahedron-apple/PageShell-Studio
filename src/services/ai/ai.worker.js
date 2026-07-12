@@ -38,12 +38,31 @@ async function getPipeline() {
     const modelId = 'onnx-community/Qwen2.5-Coder-1.5B-Instruct';
     const isWebGPUSupported = await checkWebGPUSupport();
 
+    // Forward HuggingFace download progress to the UI status bar
+    const progress_callback = (progressEvent) => {
+      if (progressEvent.status === 'downloading') {
+        const pct = progressEvent.progress != null
+          ? `${Math.round(progressEvent.progress)}%`
+          : '...';
+        const fileName = progressEvent.file ? progressEvent.file.split('/').pop() : 'weights';
+        self.postMessage({
+          type: 'STATUS',
+          message: `Downloading ${fileName}: ${pct}`
+        });
+      } else if (progressEvent.status === 'loading') {
+        self.postMessage({ type: 'STATUS', message: `Loading model into memory...` });
+      } else if (progressEvent.status === 'ready') {
+        self.postMessage({ type: 'STATUS', message: 'Model ready!' });
+      }
+    };
+
     if (isWebGPUSupported) {
       try {
         self.postMessage({ type: 'STATUS', message: 'Initializing Qwen2.5-Coder with WebGPU acceleration...' });
         tgPipeline = await pipeline('text-generation', modelId, {
           device: 'webgpu',
           dtype: 'q4',
+          progress_callback,
         });
         self.postMessage({ type: 'STATUS', message: 'Qwen2.5-Coder loaded with WebGPU!' });
         return tgPipeline;
@@ -51,13 +70,14 @@ async function getPipeline() {
         console.warn('WebGPU failed to initialize despite API support. Falling back to WASM:', gpuError);
       }
     } else {
-      self.postMessage({ type: 'STATUS', message: 'WebGPU is not supported in this browser environment. Using WASM fallback...' });
+      self.postMessage({ type: 'STATUS', message: 'WebGPU not supported. Using WASM fallback...' });
     }
 
     self.postMessage({ type: 'STATUS', message: 'Initializing Qwen2.5-Coder with WASM (CPU)...' });
     tgPipeline = await pipeline('text-generation', modelId, {
       device: 'wasm',
       dtype: 'q4',
+      progress_callback,
     });
     self.postMessage({ type: 'STATUS', message: 'Qwen2.5-Coder loaded with WASM (CPU fallback).' });
   }
