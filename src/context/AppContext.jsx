@@ -255,11 +255,20 @@ You have access to the following tools:
 <tools>
 [
   {
-    "name": "write_file",
-    "description": "Write content to a file in the workspace",
+    "name": "write_files",
+    "description": "Write one or multiple files to the workspace at once. Use this to generate whole projects (HTML, CSS, JS) together.",
     "parameters": {
-      "path": {"type": "string", "description": "Filename, e.g. script.py"},
-      "content": {"type": "string"}
+      "files": {
+        "type": "array",
+        "description": "List of files to create",
+        "items": {
+          "type": "object",
+          "properties": {
+            "path": {"type": "string", "description": "Filename, e.g. index.html"},
+            "content": {"type": "string", "description": "The full code content of the file"}
+          }
+        }
+      }
     }
   },
   {
@@ -320,9 +329,14 @@ To use a tool, output a tool call using the following XML format. Stop generatin
       if (toolData) {
         let result = '';
         try {
-          if (toolData.name === 'write_file') {
-            await fileSystemAPI.writeFile(`workspace/${toolData.args.path}`, new TextEncoder().encode(toolData.args.content));
-            result = `Successfully wrote to ${toolData.args.path}`;
+          if (toolData.name === 'write_files') {
+            // Loop through the array of files and write each one
+            const writtenPaths = [];
+            for (const file of toolData.args.files) {
+              await fileSystemAPI.writeFile(`workspace/${file.path}`, new TextEncoder().encode(file.content));
+              writtenPaths.push(file.path);
+            }
+            result = `Successfully wrote files: ${writtenPaths.join(', ')}`;
             await refreshFiles();
           } else if (toolData.name === 'run_python') {
             const pyResult = await runPython(toolData.args.code);
