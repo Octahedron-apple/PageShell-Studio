@@ -1,6 +1,9 @@
 import React from 'react';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider, useApp } from './context/AppContext.jsx';
 import { Group, Panel, Separator } from 'react-resizable-panels';
+import Sidebar from './components/Sidebar.jsx';
+import AIPage from './pages/AIPage.jsx';
 import FileManager from './components/FileManager.jsx';
 import Editor from './components/Editor.jsx';
 import Terminal from './components/Terminal.jsx';
@@ -15,7 +18,7 @@ function Workspace() {
   } = useApp();
 
   return (
-    <div style={styles.shell}>
+    <div style={styles.workspace}>
       <Group direction="horizontal">
         {/* Left Column: File Manager + Editor */}
         <Panel defaultSize={50} minSize={20} style={styles.panelColumn}>
@@ -66,7 +69,18 @@ function Workspace() {
 export default function App() {
   return (
     <AppProvider>
-      <Workspace />
+      <HashRouter>
+        <div style={styles.shell}>
+          <Sidebar />
+          <div style={styles.content}>
+            <Routes>
+              <Route path="/" element={<Navigate to="/editor" replace />} />
+              <Route path="/editor" element={<Workspace />} />
+              <Route path="/ai" element={<AIPage />} />
+            </Routes>
+          </div>
+        </div>
+      </HashRouter>
     </AppProvider>
   );
 }
@@ -80,6 +94,17 @@ const styles = {
     color: '#e2e8f0',
     fontFamily: "'Outfit', 'Inter', sans-serif",
     overflow: 'hidden',
+  },
+  content: {
+    flex: 1,
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  workspace: {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
   },
   panelColumn: {
     display: 'flex',
