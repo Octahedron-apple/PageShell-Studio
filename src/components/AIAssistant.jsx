@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLogs, statusMessage }) {
-  const [query, setQuery] = useState('Explain what data.xlsx contains and help me write a script to compute the department salary averages.');
+  const [query, setQuery] = useState('');
   const logsEndRef = useRef(null);
 
   useEffect(() => {
@@ -14,6 +14,7 @@ export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLog
     e.preventDefault();
     if (!query.trim()) return;
     onQuery(query);
+    setQuery('');
   };
 
   return (

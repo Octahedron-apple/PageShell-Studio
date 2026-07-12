@@ -20,48 +20,41 @@ function Workspace() {
   return (
     <div style={styles.workspace}>
       <Group direction="horizontal">
-        {/* Left Column: File Manager + Editor */}
-        <Panel defaultSize={50} minSize={20} style={styles.panelColumn}>
-          <Group direction="vertical">
-            <Panel defaultSize={30} minSize={15}>
-              <FileManager
-                files={files}
-                onUpload={handleUpload}
-                selectedFiles={selectedFiles}
-                onToggleSelect={handleToggleFileSelect}
-                onOpenFile={handleOpenFile}
-                mode="editor"
-              />
-            </Panel>
-            <Separator className="resize-handle" />
-            <Panel defaultSize={70} minSize={20}>
-              <Editor
-                code={code}
-                activeFile={activeFile}
-                onChange={setCode}
-                onRun={handleRun}
-                onSave={handleSaveFile}
-                loading={loading}
-              />
-            </Panel>
-          </Group>
+        {/* Left Column: File Manager */}
+        <Panel defaultSize={25} minSize={15} style={styles.panelColumn}>
+          <FileManager
+            files={files}
+            onUpload={handleUpload}
+            selectedFiles={selectedFiles}
+            onToggleSelect={handleToggleFileSelect}
+            onOpenFile={handleOpenFile}
+            mode="editor"
+          />
         </Panel>
 
         <Separator className="resize-handle" />
 
-        {/* Right Column: Preview + Console */}
-        <Panel defaultSize={50} minSize={20} style={styles.panelColumn}>
-          <Group direction="vertical">
-            <Panel defaultSize={65} minSize={20}>
-              <PreviewPage />
-            </Panel>
-            <Separator className="resize-handle" />
-            <Panel defaultSize={35} minSize={15}>
-              <Terminal logs={logs} onClear={() => setLogs([])} />
-            </Panel>
-          </Group>
+        {/* Right Column: Editor */}
+        <Panel defaultSize={75} minSize={20} style={styles.panelColumn}>
+          <Editor
+            code={code}
+            activeFile={activeFile}
+            onChange={setCode}
+            onRun={handleRun}
+            onSave={handleSaveFile}
+            loading={loading}
+          />
         </Panel>
       </Group>
+    </div>
+  );
+}
+
+function TerminalTab() {
+  const { logs, setLogs } = useApp();
+  return (
+    <div style={{ width: '100%', height: '100%' }}>
+      <Terminal logs={logs} onClear={() => setLogs([])} />
     </div>
   );
 }
@@ -76,6 +69,8 @@ export default function App() {
             <Routes>
               <Route path="/" element={<Navigate to="/editor" replace />} />
               <Route path="/editor" element={<Workspace />} />
+              <Route path="/preview" element={<PreviewPage />} />
+              <Route path="/terminal" element={<TerminalTab />} />
               <Route path="/ai" element={<AIPage />} />
             </Routes>
           </div>

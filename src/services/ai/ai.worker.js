@@ -40,7 +40,7 @@ async function getPipeline() {
 
     // Forward HuggingFace download progress to the UI status bar
     const progress_callback = (progressEvent) => {
-      if (progressEvent.status === 'downloading') {
+      if (progressEvent.status === 'progress' || progressEvent.status === 'downloading' || progressEvent.status === 'initiate') {
         const pct = progressEvent.progress != null
           ? `${Math.round(progressEvent.progress)}%`
           : '...';

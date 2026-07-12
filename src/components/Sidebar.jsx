@@ -5,6 +5,8 @@ const BASE = import.meta.env.BASE_URL;
 
 const navItems = [
   { to: '/editor', icon: '💻', label: 'Editor' },
+  { to: '/preview', icon: '🌐', label: 'Preview' },
+  { to: '/terminal', icon: '🖥️', label: 'Terminal' },
   { to: '/ai',      icon: '🤖', label: 'AI' },
 ];
 

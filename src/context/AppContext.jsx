@@ -8,30 +8,7 @@ const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
   // --- Editor State ---
-  const [code, setCode] = useState(`import pandas as pd
-import numpy as np
-
-print("--- Initializing Python Analysis ---")
-
-try:
-    df = pd.read_excel("data.xlsx")
-    print("🚀 Natively loaded 'data.xlsx' from OPFS workspace!")
-    print("\\nSummary Statistics:")
-    print(df.describe())
-    print("\\nFirst 5 rows:")
-    print(df.head())
-except Exception as e:
-    print("⚠️ 'data.xlsx' not found. Creating a template data.xlsx for you...")
-    df = pd.DataFrame({
-        "Employee": ["Alice Smith", "Bob Jones", "Charlie Brown", "Diana Prince", "Evan Wright"],
-        "Department": ["Engineering", "Product", "Engineering", "Design", "Product"],
-        "Salary": [85000, 92000, 78000, 88000, 95000],
-        "Performance_Score": [4.8, 4.2, 4.5, 4.9, 4.0]
-    })
-    df.to_excel("data.xlsx", index=False)
-    print("💾 Successfully saved template data.xlsx to OPFS workspace!")
-    print("Re-run the script to perform automated excel sheet reading!")
-`);
+  const [code, setCode] = useState('');
   const [activeFile, setActiveFile] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -108,6 +85,30 @@ button {
       await fileSystemAPI.writeFile('workspace/script.js', encoder.encode(`document.getElementById('clickMe').addEventListener('click', () => {
     alert('Hello from PageShell Studio!');
 });`));
+      await fileSystemAPI.writeFile('workspace/Python scripts/main.py', encoder.encode(`import pandas as pd
+import numpy as np
+
+print("--- Initializing Python Analysis ---")
+
+try:
+    df = pd.read_excel("data.xlsx")
+    print("🚀 Natively loaded 'data.xlsx' from OPFS workspace!")
+    print("\\nSummary Statistics:")
+    print(df.describe())
+    print("\\nFirst 5 rows:")
+    print(df.head())
+except Exception as e:
+    print("⚠️ 'data.xlsx' not found. Creating a template data.xlsx for you...")
+    df = pd.DataFrame({
+        "Employee": ["Alice Smith", "Bob Jones", "Charlie Brown", "Diana Prince", "Evan Wright"],
+        "Department": ["Engineering", "Product", "Engineering", "Design", "Product"],
+        "Salary": [85000, 92000, 78000, 88000, 95000],
+        "Performance_Score": [4.8, 4.2, 4.5, 4.9, 4.0]
+    })
+    df.to_excel("data.xlsx", index=False)
+    print("💾 Successfully saved template data.xlsx to OPFS workspace!")
+    print("Re-run the script to perform automated excel sheet reading!")
+`));
       await refreshFiles();
     }
   };
