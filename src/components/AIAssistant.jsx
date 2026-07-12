@@ -93,7 +93,6 @@ const styles = {
     flexDirection: 'column',
     height: '100%',
     backgroundColor: '#121215',
-    borderLeft: '1px solid #222228',
     boxSizing: 'border-box'
   },
   header: {
