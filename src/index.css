@@ -1,14 +1,20 @@
+@import "tailwindcss";
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
+@theme {
+  --font-sans: 'Outfit', 'Inter', system-ui, sans-serif;
+}
+
 :root {
-  font-family: 'Outfit', 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.5;
   font-weight: 400;
   color-scheme: dark;
-  background-color: #0f0f11;
-  color: rgba(255, 255, 255, 0.87);
+  background-color: var(--color-zinc-950);
+  color: var(--color-zinc-100);
 }
 
 html, body, #root {

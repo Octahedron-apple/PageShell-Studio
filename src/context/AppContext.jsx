@@ -7,6 +7,9 @@ import localforage from 'localforage';
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
+  // --- Navigation State ---
+  const [currentPage, setCurrentPage] = useState('editor');
+
   // --- Editor State ---
   const [code, setCode] = useState('');
   const [activeFile, setActiveFile] = useState(null);
@@ -155,11 +158,10 @@ except Exception as e:
     }
 
     try {
-      // If it's a document format, just set active file and route to the docs viewer
       if (['pdf', 'docx', 'xlsx', 'xls'].includes(ext)) {
         setActiveFile(filePath);
         setLogs(prev => [...prev, { type: 'info', text: `Opening ${filePath} in Documents viewer.` }]);
-        window.location.hash = '#/documents';
+        setCurrentPage('documents');
         return;
       }
 
@@ -168,7 +170,7 @@ except Exception as e:
       setCode(content);
       setActiveFile(filePath);
       setLogs(prev => [...prev, { type: 'info', text: `Opened ${filePath} in editor.` }]);
-      window.location.hash = '#/editor';
+      setCurrentPage('editor');
     } catch (err) {
       setLogs(prev => [...prev, { type: 'stderr', text: `Failed to open file: ${err.message}` }]);
     }
@@ -438,6 +440,7 @@ To use a tool, output a tool call using the following XML format. Stop generatin
 
   return (
     <AppContext.Provider value={{
+      currentPage, setCurrentPage,
       code, setCode, activeFile, setActiveFile, loading,
       files, logs, setLogs,
       selectedFiles, aiLogs, setAiLogs, statusMessage, aiStreaming,

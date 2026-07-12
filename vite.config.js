@@ -1,9 +1,10 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   base: '/PageShell-Studio/',
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   assetsInclude: ['**/*.whl'],
   worker: {
     format: 'es',
