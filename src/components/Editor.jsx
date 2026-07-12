@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { EditorState } from '@codemirror/state';
 import { EditorView, basicSetup } from 'codemirror';
-import { keymap } from '@codemirror/view';
+import { keymap, drawSelection, dropCursor, rectangularSelection, highlightActiveLine } from '@codemirror/view';
 import { python } from '@codemirror/lang-python';
 import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
@@ -47,10 +47,16 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
         oneDark,
         updateListener,
         saveKeymap,
+        drawSelection(),
+        dropCursor(),
+        rectangularSelection(),
+        highlightActiveLine(),
+        EditorView.lineWrapping,
         // Make the editor take full height of its wrapper
         EditorView.theme({
           "&": { height: "100%", width: "100%", backgroundColor: "#1a1a1e" },
-          ".cm-scroller": { fontFamily: "'Fira Code', 'Courier New', Courier, monospace" }
+          ".cm-scroller": { fontFamily: "'Fira Code', 'Courier New', Courier, monospace" },
+          ".cm-activeLine": { backgroundColor: "rgba(255, 255, 255, 0.04)" }
         })
       ]
     });
@@ -97,7 +103,7 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
           disabled={loading}
           style={{
             ...styles.runButton,
-            opacity: loading ? 0.7 : 1
+            ...(loading ? styles.runButtonLoading : {})
           }}
           id="editor-run-btn"
         >
@@ -155,14 +161,15 @@ const styles = {
     fontSize: '13px',
     cursor: 'pointer',
     boxShadow: '0 4px 12px rgba(79, 172, 254, 0.2)',
-    transition: 'transform 0.15s, box-shadow 0.15s',
+    transition: 'all 0.3s ease',
     outline: 'none',
-    '&:hover': {
-      transform: 'translateY(-1px)'
-    },
-    '&:active': {
-      transform: 'translateY(0)'
-    }
+  },
+  runButtonLoading: {
+    backgroundImage: 'none',
+    backgroundColor: '#f59e0b',
+    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
+    cursor: 'not-allowed',
+    animation: 'pulse 1.5s infinite',
   },
   editorWrapper: {
     flex: 1,

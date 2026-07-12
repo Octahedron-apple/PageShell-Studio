@@ -1,30 +1,72 @@
 import React from 'react';
-import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AppProvider } from './context/AppContext.jsx';
-import Sidebar from './components/Sidebar.jsx';
-import EditorPage from './pages/EditorPage.jsx';
+import { AppProvider, useApp } from './context/AppContext.jsx';
+import { Group, Panel, Separator } from 'react-resizable-panels';
+import FileManager from './components/FileManager.jsx';
+import Editor from './components/Editor.jsx';
+import Terminal from './components/Terminal.jsx';
 import PreviewPage from './pages/PreviewPage.jsx';
-import AIPage from './pages/AIPage.jsx';
+
+function Workspace() {
+  const {
+    code, setCode, activeFile, loading,
+    files, logs, setLogs,
+    handleRun, handleUpload, handleOpenFile, handleSaveFile,
+    selectedFiles, handleToggleFileSelect,
+  } = useApp();
+
+  return (
+    <div style={styles.shell}>
+      <Group direction="horizontal">
+        {/* Left Column: File Manager + Editor */}
+        <Panel defaultSize={50} minSize={20} style={styles.panelColumn}>
+          <Group direction="vertical">
+            <Panel defaultSize={30} minSize={15}>
+              <FileManager
+                files={files}
+                onUpload={handleUpload}
+                selectedFiles={selectedFiles}
+                onToggleSelect={handleToggleFileSelect}
+                onOpenFile={handleOpenFile}
+                mode="editor"
+              />
+            </Panel>
+            <Separator className="resize-handle" />
+            <Panel defaultSize={70} minSize={20}>
+              <Editor
+                code={code}
+                activeFile={activeFile}
+                onChange={setCode}
+                onRun={handleRun}
+                onSave={handleSaveFile}
+                loading={loading}
+              />
+            </Panel>
+          </Group>
+        </Panel>
+
+        <Separator className="resize-handle" />
+
+        {/* Right Column: Preview + Console */}
+        <Panel defaultSize={50} minSize={20} style={styles.panelColumn}>
+          <Group direction="vertical">
+            <Panel defaultSize={65} minSize={20}>
+              <PreviewPage />
+            </Panel>
+            <Separator className="resize-handle" />
+            <Panel defaultSize={35} minSize={15}>
+              <Terminal logs={logs} onClear={() => setLogs([])} />
+            </Panel>
+          </Group>
+        </Panel>
+      </Group>
+    </div>
+  );
+}
 
 export default function App() {
   return (
     <AppProvider>
-      <HashRouter>
-        <div style={styles.shell}>
-          {/* Persistent icon nav */}
-          <Sidebar />
-
-          {/* Page content area */}
-          <div style={styles.content}>
-            <Routes>
-              <Route path="/" element={<Navigate to="/editor" replace />} />
-              <Route path="/editor"  element={<EditorPage />} />
-              <Route path="/preview" element={<PreviewPage />} />
-              <Route path="/ai"      element={<AIPage />} />
-            </Routes>
-          </div>
-        </div>
-      </HashRouter>
+      <Workspace />
     </AppProvider>
   );
 }
@@ -39,10 +81,9 @@ const styles = {
     fontFamily: "'Outfit', 'Inter', sans-serif",
     overflow: 'hidden',
   },
-  content: {
-    flex: 1,
-    overflow: 'hidden',
+  panelColumn: {
     display: 'flex',
     flexDirection: 'column',
+    height: '100%',
   },
 };

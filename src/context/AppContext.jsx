@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { fileSystemAPI } from '../services/fs/fileSystem.js';
 import { runPython, subscribePythonLogs } from '../services/runtimes/pyodide.js';
 import { generateCode, subscribeAIStatus } from '../services/ai/models.js';
+import localforage from 'localforage';
 
 const AppContext = createContext(null);
 
@@ -246,6 +247,54 @@ preview_excel()
     refreshFiles().then(initializeDefaultWebFiles);
     subscribePythonLogs(log => setLogs(prev => [...prev, { type: log.type, text: log.text }]));
     subscribeAIStatus(status => setStatusMessage(status));
+
+    // Hydrate state from localforage
+    const hydrateState = async () => {
+      try {
+        const savedFile = await localforage.getItem('activeFile');
+        const savedCode = await localforage.getItem('code');
+        if (savedFile) setActiveFile(savedFile);
+        if (savedCode) setCode(savedCode);
+      } catch (err) {
+        console.error('Failed to hydrate state from localforage:', err);
+      }
+    };
+    hydrateState();
+  }, []);
+
+  // Sync activeFile to localforage
+  useEffect(() => {
+    if (activeFile !== null) {
+      localforage.setItem('activeFile', activeFile).catch(console.error);
+    } else {
+      localforage.removeItem('activeFile').catch(console.error);
+    }
+  }, [activeFile]);
+
+  // Sync code to localforage
+  useEffect(() => {
+    if (code !== null) {
+      localforage.setItem('code', code).catch(console.error);
+    }
+  }, [code]);
+
+  // Global F5 Capture
+  const handleRunRef = useRef(handleRun);
+  const loadingRef = useRef(loading);
+  useEffect(() => { handleRunRef.current = handleRun; }, [handleRun]);
+  useEffect(() => { loadingRef.current = loading; }, [loading]);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'F5') {
+        e.preventDefault();
+        if (!loadingRef.current) {
+          handleRunRef.current();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   return (

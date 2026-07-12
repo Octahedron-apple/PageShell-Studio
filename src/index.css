@@ -18,3 +18,17 @@ html, body, #root {
   height: 100%;
   overflow: hidden;
 }
+
+/* react-resizable-panels resize handles */
+.resize-handle {
+  width: 4px;
+  background-color: #222228;
+  cursor: col-resize;
+  transition: background-color 0.15s;
+  z-index: 10;
+}
+
+.resize-handle:hover,
+.resize-handle[data-resize-handle-state="drag"] {
+  background-color: #4facfe;
+}
