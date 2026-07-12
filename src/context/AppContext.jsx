@@ -275,11 +275,27 @@ To use a tool, output a tool call using the following XML format. Stop generatin
         });
       });
 
-      const toolCallMatch = fullOutput.match(/<tool_call>([\s\S]*?)<\/tool_call>/);
+      let toolCallMatch;
+      if (typeof fullOutput === 'string') {
+        toolCallMatch = fullOutput.match(/<tool_call>([\s\S]*?)<\/tool_call>/);
+      }
+      
+      let toolData = null;
       if (toolCallMatch) {
+        try { toolData = JSON.parse(toolCallMatch[1].trim()); } catch(e){}
+      } else if (typeof fullOutput === 'string') {
+        // Fallback: If the model forgot the XML tags but returned valid JSON
+        try {
+          const parsed = JSON.parse(fullOutput.trim());
+          if (parsed.name && parsed.args) {
+            toolData = parsed;
+          }
+        } catch(e){}
+      }
+
+      if (toolData) {
         let result = '';
         try {
-          const toolData = JSON.parse(toolCallMatch[1].trim());
           if (toolData.name === 'write_file') {
             await fileSystemAPI.writeFile(`workspace/${toolData.args.path}`, new TextEncoder().encode(toolData.args.content));
             result = `Successfully wrote to ${toolData.args.path}`;

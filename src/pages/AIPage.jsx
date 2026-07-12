@@ -8,6 +8,7 @@ export default function AIPage() {
     files, selectedFiles, aiLogs, setAiLogs,
     statusMessage, handleQuery, handleUpload,
     handleToggleFileSelect, handleOpenFile,
+    aiStreaming,
   } = useApp();
 
   return (
@@ -20,6 +21,7 @@ export default function AIPage() {
           aiLogs={aiLogs}
           onClearLogs={() => setAiLogs([])}
           statusMessage={statusMessage}
+          aiStreaming={aiStreaming}
         />
       </main>
     </div>

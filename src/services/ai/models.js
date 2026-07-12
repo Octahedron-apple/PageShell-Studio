@@ -23,7 +23,7 @@ function getWorker() {
         }
       } else if (type === 'COMPLETE') {
         if (currentOnComplete) {
-          currentOnComplete(output);
+          currentOnComplete(accumulatedOutput || output);
         }
         currentOnToken = null;
         currentOnComplete = null;

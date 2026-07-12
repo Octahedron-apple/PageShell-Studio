@@ -1,66 +1,10 @@
-import React from 'react';
-import { OTExplorerComp } from 'opfs-tools-explorer';
+import React, { useState, useRef } from 'react';
 
 const BINARY_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'xlsx', 'xls', 'whl', 'wasm', 'mp4', 'webp'];
+const TEXT_EXTS   = ['html', 'css', 'js', 'py', 'json', 'md', 'txt', 'csv'];
 
-// mode: 'editor' — clickable file list for opening in editor
-// mode: 'ai'     — checkbox list for AI context selection
-export default function FileManager({ files, onUpload, selectedFiles = [], onToggleSelect, onOpenFile, mode = 'editor' }) {
-  const textFiles = files.filter(f => !BINARY_EXTS.includes(f.name.split('.').pop().toLowerCase()));
-
-  return (
-    <div style={styles.container}>
-      {/* Native OPFS explorer — create, rename, delete, upload */}
-      <div style={styles.explorerWrapper}>
-        <OTExplorerComp />
-      </div>
-
-      {/* Bottom panel: differs by mode */}
-      {mode === 'editor' && textFiles.length > 0 && (
-        <div style={styles.bottomPanel}>
-          <p style={styles.panelLabel}>📂 Open in Editor</p>
-          <ul style={styles.list}>
-            {textFiles.map((file) => (
-              <li
-                key={file.path}
-                style={styles.editorItem}
-                onClick={() => onOpenFile && onOpenFile(file.path)}
-                title={`Open ${file.name}`}
-              >
-                <span style={styles.fileIcon}>{getIcon(file.name)}</span>
-                <span style={styles.fileName}>{file.name}</span>
-                <span style={styles.fileType}>{file.name.split('.').pop().toUpperCase()}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {mode === 'ai' && files.length > 0 && (
-        <div style={styles.bottomPanel}>
-          <p style={styles.panelLabel}>📎 AI Context</p>
-          <ul style={styles.list}>
-            {files.map((file) => (
-              <li key={file.path} style={styles.aiItem}>
-                <input
-                  type="checkbox"
-                  checked={selectedFiles.includes(file.path)}
-                  onChange={() => onToggleSelect(file.path)}
-                  style={styles.checkbox}
-                />
-                <span style={styles.fileName}>{file.name}</span>
-                <span style={styles.fileType}>{file.name.split('.').pop().toUpperCase()}</span>
-              </li>
-            ))}
-          </ul>
-          <p style={styles.contextHint}>Check files to attach as AI context</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function getIcon(name) {
+function getIcon(name, isDir) {
+  if (isDir) return '📁';
   const ext = name.split('.').pop().toLowerCase();
   if (ext === 'html') return '🌐';
   if (ext === 'css')  return '🎨';
@@ -68,7 +12,132 @@ function getIcon(name) {
   if (ext === 'py')   return '🐍';
   if (ext === 'json') return '📋';
   if (ext === 'md')   return '📝';
+  if (ext === 'xlsx' || ext === 'xls') return '📊';
   return '📄';
+}
+
+function canOpenInEditor(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  return TEXT_EXTS.includes(ext);
+}
+
+function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode }) {
+  const [open, setOpen] = useState(true);
+  const isDir = node.type === 'directory';
+
+  const handleClick = () => {
+    if (isDir) {
+      setOpen(o => !o);
+    } else if (mode === 'editor' && canOpenInEditor(node.name)) {
+      onOpenFile && onOpenFile(node.path);
+    }
+  };
+
+  const indent = depth * 16;
+  const isSelected = !isDir && selectedFiles?.includes(node.path);
+  const isEditable = !isDir && canOpenInEditor(node.name);
+
+  return (
+    <>
+      <div
+        style={{
+          ...styles.row,
+          paddingLeft: `${indent + 12}px`,
+          cursor: isDir ? 'pointer' : isEditable ? 'pointer' : 'default',
+          backgroundColor: isSelected ? 'rgba(79, 172, 254, 0.12)' : undefined,
+          borderLeft: isSelected ? '2px solid #4facfe' : '2px solid transparent',
+          opacity: !isDir && !isEditable && mode === 'editor' ? 0.45 : 1,
+        }}
+        onClick={handleClick}
+        title={isDir ? (open ? 'Collapse' : 'Expand') : node.path}
+      >
+        {mode === 'ai' && !isDir && (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={e => { e.stopPropagation(); onToggleSelect && onToggleSelect(node.path); }}
+            style={styles.checkbox}
+            onClick={e => e.stopPropagation()}
+          />
+        )}
+        <span style={styles.arrow}>
+          {isDir ? (open ? '▾' : '▸') : ''}
+        </span>
+        <span style={styles.icon}>{getIcon(node.name, isDir)}</span>
+        <span style={{ ...styles.name, color: isDir ? '#a0aec0' : isEditable ? '#e2e8f0' : '#718096' }}>
+          {node.name}
+        </span>
+        {!isDir && (
+          <span style={styles.badge}>{node.name.split('.').pop().toUpperCase()}</span>
+        )}
+      </div>
+      {isDir && open && node.children && node.children.map(child => (
+        <FileNode
+          key={child.path}
+          node={child}
+          depth={depth + 1}
+          onOpenFile={onOpenFile}
+          selectedFiles={selectedFiles}
+          onToggleSelect={onToggleSelect}
+          mode={mode}
+        />
+      ))}
+    </>
+  );
+}
+
+export default function FileManager({ files, onUpload, selectedFiles = [], onToggleSelect, onOpenFile, mode = 'editor' }) {
+  const uploadRef = useRef(null);
+
+  // files is an array of top-level nodes inside "workspace"
+  const nodes = files || [];
+
+  return (
+    <div style={styles.container}>
+      {/* Header */}
+      <div style={styles.header}>
+        <span style={styles.headerTitle}>📁 Files</span>
+        <button
+          style={styles.uploadBtn}
+          onClick={() => uploadRef.current?.click()}
+          title="Upload file to workspace"
+        >
+          ↑ Upload
+        </button>
+        <input
+          ref={uploadRef}
+          type="file"
+          style={{ display: 'none' }}
+          onChange={e => { if (e.target.files[0]) onUpload?.(e.target.files[0]); e.target.value = ''; }}
+        />
+      </div>
+
+      {/* Tree */}
+      <div style={styles.tree}>
+        {nodes.length === 0 ? (
+          <div style={styles.empty}>No files yet. Upload or run a script to create files.</div>
+        ) : (
+          nodes.map(node => (
+            <FileNode
+              key={node.path}
+              node={node}
+              depth={0}
+              onOpenFile={onOpenFile}
+              selectedFiles={selectedFiles}
+              onToggleSelect={onToggleSelect}
+              mode={mode}
+            />
+          ))
+        )}
+      </div>
+
+      {mode === 'ai' && (
+        <div style={styles.contextHint}>
+          ☑ Check files to include as AI context
+        </div>
+      )}
+    </div>
+  );
 }
 
 const styles = {
@@ -76,95 +145,102 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%',
-    backgroundColor: '#121215',
+    backgroundColor: '#0d0d10',
     boxSizing: 'border-box',
     overflow: 'hidden',
+    fontFamily: "'Inter', 'Segoe UI', sans-serif",
   },
-  explorerWrapper: {
-    flex: 1,
-    overflow: 'auto',
-    minHeight: 0,
-    colorScheme: 'light',
-    backgroundColor: '#fff',
-  },
-  bottomPanel: {
-    borderTop: '1px solid #222228',
-    padding: '10px 12px',
-    backgroundColor: '#0d0d10',
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '10px 14px',
+    borderBottom: '1px solid #1a1a22',
+    backgroundColor: '#121215',
+    gap: '8px',
     flexShrink: 0,
-    maxHeight: '240px',
-    overflowY: 'auto',
   },
-  panelLabel: {
-    fontSize: '10px',
+  headerTitle: {
+    flex: 1,
+    fontSize: '12px',
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: '0.06em',
-    color: '#4a5568',
-    margin: '0 0 6px 0',
+    letterSpacing: '0.05em',
+    color: '#718096',
   },
-  contextHint: {
+  uploadBtn: {
+    backgroundColor: 'transparent',
+    border: '1px solid #2d3748',
+    color: '#a0aec0',
+    fontSize: '11px',
+    fontWeight: '700',
+    padding: '3px 10px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    transition: 'all 0.15s',
+  },
+  tree: {
+    flex: 1,
+    overflowY: 'auto',
+    padding: '6px 0',
+  },
+  row: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '5px 12px',
+    fontSize: '13px',
+    transition: 'background 0.1s',
+    userSelect: 'none',
+    minHeight: '30px',
+    boxSizing: 'border-box',
+  },
+  arrow: {
+    width: '10px',
     fontSize: '10px',
     color: '#4a5568',
-    margin: '6px 0 0 0',
-    fontStyle: 'italic',
+    flexShrink: 0,
+    textAlign: 'center',
   },
-  list: {
-    listStyle: 'none',
-    padding: 0,
-    margin: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '3px',
-  },
-  editorItem: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '6px 10px',
-    backgroundColor: '#16161a',
-    borderRadius: '5px',
-    border: '1px solid #222228',
-    fontSize: '12px',
-    gap: '7px',
-    cursor: 'pointer',
-    boxSizing: 'border-box',
-    transition: 'background 0.15s, border-color 0.15s',
-  },
-  aiItem: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '5px 10px',
-    backgroundColor: '#16161a',
-    borderRadius: '5px',
-    border: '1px solid #222228',
-    fontSize: '12px',
-    gap: '7px',
-    boxSizing: 'border-box',
-  },
-  fileIcon: {
+  icon: {
     fontSize: '14px',
     flexShrink: 0,
   },
-  fileName: {
+  name: {
     flex: 1,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
-    color: '#e2e8f0',
   },
-  fileType: {
+  badge: {
     fontSize: '9px',
     fontWeight: '800',
-    backgroundColor: '#2d3748',
-    color: '#a0aec0',
+    backgroundColor: '#1a1a2a',
+    color: '#4a5568',
     padding: '2px 5px',
     borderRadius: '3px',
     flexShrink: 0,
+    border: '1px solid #2d3748',
   },
   checkbox: {
     margin: 0,
     cursor: 'pointer',
     accentColor: '#4facfe',
+    flexShrink: 0,
+  },
+  empty: {
+    padding: '24px 16px',
+    fontSize: '12px',
+    color: '#4a5568',
+    textAlign: 'center',
+    lineHeight: '1.6',
+    fontStyle: 'italic',
+  },
+  contextHint: {
+    padding: '8px 14px',
+    fontSize: '11px',
+    color: '#4a5568',
+    borderTop: '1px solid #1a1a22',
+    fontStyle: 'italic',
     flexShrink: 0,
   },
 };

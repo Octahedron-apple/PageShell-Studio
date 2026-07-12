@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
-export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLogs, statusMessage }) {
+export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLogs, statusMessage, aiStreaming }) {
   const [query, setQuery] = useState('');
   const logsEndRef = useRef(null);
 
@@ -84,12 +84,13 @@ export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLog
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Ask AI about selected files..."
-          style={styles.input}
+          placeholder={aiStreaming ? "AI is typing..." : "Ask AI about selected files..."}
+          style={{ ...styles.input, ...(aiStreaming ? styles.inputDisabled : {}) }}
+          disabled={aiStreaming}
           id="ai-query-input"
         />
-        <button type="submit" style={styles.sendButton} id="ai-send-btn">
-          Ask
+        <button type="submit" style={styles.sendButton} id="ai-send-btn" disabled={aiStreaming}>
+          {aiStreaming ? 'Working...' : 'Ask'}
         </button>
       </form>
     </div>
@@ -285,6 +286,11 @@ const styles = {
     '&::placeholder': {
       color: '#4a5568'
     }
+  },
+  inputDisabled: {
+    backgroundColor: '#16161a',
+    color: '#718096',
+    cursor: 'not-allowed'
   },
   sendButton: {
     backgroundColor: '#4facfe',
