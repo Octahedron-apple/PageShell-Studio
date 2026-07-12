@@ -292,49 +292,44 @@ preview_excel()
       }
     }
 
-    const systemPrompt = `You are an offline coding assistant. Here is the relevant file context:\n${contextText}\n\nProvide helpful code solutions. If you need to make changes to files, use the provided tools.`;
-    
     const tools = [
       {
-        type: "function",
-        function: {
-          name: "write_files",
-          description: "Write one or multiple files to the workspace at once. Use this to generate whole projects (HTML, CSS, JS) together.",
-          parameters: {
-            type: "object",
-            properties: {
-              files: {
-                type: "array",
-                description: "List of files to create",
-                items: {
-                  type: "object",
-                  properties: {
-                    path: { type: "string", description: "Filename, e.g. index.html" },
-                    content: { type: "string", description: "The full code content of the file" }
-                  },
-                  required: ["path", "content"]
-                }
-              }
-            },
-            required: ["files"]
+        name: "write_files",
+        description: "Write one or multiple files to the workspace at once. Use this to generate whole projects (HTML, CSS, JS) together.",
+        parameters: {
+          files: {
+            type: "array",
+            description: "List of files to create",
+            items: {
+              type: "object",
+              properties: {
+                path: { type: "string", description: "Filename, e.g. index.html" },
+                content: { type: "string", description: "The full code content of the file" }
+              },
+              required: ["path", "content"]
+            }
           }
         }
       },
       {
-        type: "function",
-        function: {
-          name: "run_python",
-          description: "Execute Python code in the Pyodide sandbox",
-          parameters: {
-            type: "object",
-            properties: {
-              code: { type: "string" }
-            },
-            required: ["code"]
-          }
+        name: "run_python",
+        description: "Execute Python code in the Pyodide sandbox",
+        parameters: {
+          code: { type: "string" }
         }
       }
     ];
+
+    const systemPrompt = `You are an offline coding assistant. Here is the relevant file context:\n${contextText}
+
+You have access to the following tools:
+<tools>
+${JSON.stringify(tools, null, 2)}
+</tools>
+To use a tool, output a tool call using the following XML format. Stop generating text immediately after the closing tag.
+<tool_call>
+{"name": "tool_name", "args": {"arg_name": "arg_value"}}
+</tool_call>`;
 
     const historyMessages = aiLogs
       .filter(log => log.sender === 'user' || log.sender === 'ai')
@@ -351,26 +346,25 @@ preview_excel()
     while (true) {
       setAiLogs(prev => [...prev, { sender: 'ai', text: '' }]);
       
-      const { fullOutput, tool_calls } = await generateCodeAsync(currentMessages, (token) => {
+      const { fullOutput } = await generateCodeAsync(currentMessages, (token) => {
         setAiLogs(prev => {
           const next = [...prev];
           const last = next[next.length - 1];
           if (last?.sender === 'ai') next[next.length - 1] = { ...last, text: last.text + token };
           return next;
         });
-      }, tools);
+      }); // DO NOT pass `tools` parameter here because Qwen 1.5B does not support native tools.
 
+      let toolCallMatch;
+      if (typeof fullOutput === 'string') {
+        toolCallMatch = fullOutput.match(/<tool_call>([\s\S]*?)<\/tool_call>/);
+      }
+      
       let toolData = null;
-      if (tool_calls && tool_calls.length > 0) {
-        const tc = tool_calls[0]; // Process the first tool call
-        try { 
-          toolData = {
-            name: tc.function.name,
-            args: JSON.parse(tc.function.arguments)
-          };
-        } catch(e){}
+      if (toolCallMatch) {
+        try { toolData = JSON.parse(toolCallMatch[1].trim()); } catch(e){}
       } else if (typeof fullOutput === 'string') {
-        // Fallback: If the model returned valid JSON in the text
+        // Fallback: If the model forgot the XML tags but returned valid JSON
         try {
           const parsed = JSON.parse(fullOutput.trim());
           if (parsed.name && parsed.args) {
