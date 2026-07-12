@@ -185,6 +185,30 @@ except Exception as e:
     });
   };
 
+  const handleAutocomplete = async (prefixText) => {
+    const systemPrompt = `You are a code completion engine. Output ONLY raw code to complete the given prefix. Do NOT wrap the code in markdown (e.g., \`\`\`), do NOT output any conversational text, and do NOT output <tool_call> tags. Your response must be the exact raw string continuation of the user's code.`;
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: `Please complete the following code:\n\n${prefixText}` }
+    ];
+
+    const result = await generateCodeAsync(messages, () => {});
+    
+    // Clean up potential markdown formatting that the model might incorrectly output
+    let cleanText = result.trim();
+    if (cleanText.startsWith('```')) {
+      const firstNewline = cleanText.indexOf('\n');
+      if (firstNewline !== -1) {
+        cleanText = cleanText.substring(firstNewline + 1);
+      }
+    }
+    if (cleanText.endsWith('```')) {
+      cleanText = cleanText.substring(0, cleanText.length - 3);
+    }
+    
+    return cleanText.trim();
+  };
+
   const handleQuery = async (queryText) => {
     if (loading || aiStreaming) return;
     setAiStreaming(true);
@@ -391,7 +415,7 @@ To use a tool, output a tool call using the following XML format. Stop generatin
       files, logs, setLogs,
       selectedFiles, aiLogs, setAiLogs, statusMessage, aiStreaming,
       handleRun, handleUpload, handleOpenFile, handleSaveFile,
-      handleToggleFileSelect, handleQuery, refreshFiles,
+      handleToggleFileSelect, handleQuery, refreshFiles, handleAutocomplete,
     }}>
       {children}
     </AppContext.Provider>

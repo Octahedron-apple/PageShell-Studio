@@ -7,6 +7,8 @@ import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
 import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { autocompletion } from '@codemirror/autocomplete';
+import { useApp } from '../context/AppContext.jsx';
 
 export default function Editor({ code, activeFile, onChange, onRun, onSave, loading }) {
   const editorContainerRef = useRef(null);
@@ -18,8 +20,33 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
 
+  const { handleAutocomplete } = useApp();
+  const handleAutocompleteRef = useRef(handleAutocomplete);
+  useEffect(() => { handleAutocompleteRef.current = handleAutocomplete; }, [handleAutocomplete]);
+
   // Initialize CodeMirror instance
   useEffect(() => {
+    const aiAutocompleteSource = async (context) => {
+      // Only trigger autocomplete on explicit user request (e.g., Ctrl + Space)
+      if (!context.explicit) return null;
+
+      // Extract up to 1000 characters before the cursor for context
+      const prefixText = context.state.sliceDoc(Math.max(0, context.pos - 1000), context.pos);
+      if (!prefixText.trim() || !handleAutocompleteRef.current) return null;
+
+      try {
+        const completion = await handleAutocompleteRef.current(prefixText);
+        if (!completion) return null;
+
+        return {
+          from: context.pos,
+          options: [{ label: completion, type: 'text', apply: completion }]
+        };
+      } catch (err) {
+        console.error("Autocomplete failed:", err);
+        return null;
+      }
+    };
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged && update.transactions.some(tr => tr.isUserEvent('input') || tr.isUserEvent('delete') || tr.isUserEvent('undo') || tr.isUserEvent('redo') || tr.isUserEvent('paste') || tr.isUserEvent('cut'))) {
         if (onChangeRef.current) onChangeRef.current(update.state.doc.toString());
@@ -51,6 +78,7 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
         dropCursor(),
         rectangularSelection(),
         highlightActiveLine(),
+        autocompletion({ override: [aiAutocompleteSource] }),
         EditorView.lineWrapping,
         // Make the editor take full height of its wrapper
         EditorView.theme({
