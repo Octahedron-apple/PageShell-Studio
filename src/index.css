@@ -38,3 +38,35 @@ html, body, #root {
 .resize-handle[data-resize-handle-state="drag"] {
   background-color: #4facfe;
 }
+
+/* Markdown Rendering Styles */
+.markdown-body {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.markdown-body p {
+  margin-bottom: 8px;
+}
+.markdown-body p:last-child {
+  margin-bottom: 0;
+}
+.markdown-body pre {
+  background-color: #1a1a20;
+  border: 1px solid #222228;
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+.markdown-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 12px;
+  background-color: #1a1a20;
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.markdown-body pre code {
+  background-color: transparent;
+  padding: 0;
+  border-radius: 0;
+}

@@ -367,7 +367,18 @@ To use a tool, output a tool call using the following XML format. Stop generatin
         currentMessages.push({ role: 'assistant', content: fullOutput });
         currentMessages.push({ role: 'system', content: `<tool_response>\n${result}\n</tool_response>` });
         
-        setAiLogs(prev => [...prev, { sender: 'ai', text: `\n\n🔧 Tool Result: ${result}\n\n` }]);
+        setAiLogs(prev => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last?.sender === 'ai') {
+            let cleaned = last.text.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
+            if (!toolCallMatch && cleaned.startsWith('{') && cleaned.endsWith('}')) {
+              cleaned = '';
+            }
+            next[next.length - 1] = { ...last, text: cleaned };
+          }
+          return [...next, { sender: 'ai', text: `🔧 Tool Result: ${result}` }];
+        });
       } else {
         break;
       }

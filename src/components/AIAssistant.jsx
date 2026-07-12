@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLogs, statusMessage, aiStreaming }) {
   const [query, setQuery] = useState('');
@@ -71,7 +72,9 @@ export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLog
               <div style={styles.messageHeader}>
                 <strong>{msg.sender === 'user' ? 'You' : 'Assistant'}</strong>
               </div>
-              <div style={styles.messageContent}>{msg.text}</div>
+              <div style={styles.messageContent} className={msg.sender === 'user' ? '' : 'markdown-body'}>
+                {msg.sender === 'user' ? msg.text : <ReactMarkdown>{msg.text}</ReactMarkdown>}
+              </div>
             </div>
           ))
         )}
