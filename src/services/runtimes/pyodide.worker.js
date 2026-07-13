@@ -12,7 +12,7 @@ function getPyodide() {
   if (!pyodidePromise) {
     pyodidePromise = (async () => {
       const pyodide = await loadPyodide({
-        indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/',
+        indexURL: `${import.meta.env.BASE_URL}vendor/pyodide_core/`,
         stdout: (text) => {
           self.postMessage({ txId: currentTxId, type: 'STDOUT', data: text });
         },
@@ -74,16 +74,23 @@ self.onmessage = async (event) => {
     const pyodide = await getPyodide();
     currentTxId = txId;
 
-    // Inject raw input string securely into Python global scope
-    pyodide.globals.set('INPUT_DATA', inputStringData || '');
+    // Create a sandboxed dictionary for execution to prevent memory leaks
+    const namespace = pyodide.globals.get('dict')();
+    namespace.set('INPUT_DATA', inputStringData || '');
 
-    // Run the Python script string asynchronously
-    const result = await pyodide.runPythonAsync(pythonCodeString);
+    // Run the Python script string asynchronously inside the sandbox
+    const result = await pyodide.runPythonAsync(pythonCodeString, { globals: namespace });
 
     // Safe conversion of Python proxy results back to native JavaScript structures
     let output = result;
     if (result && typeof result.toJs === 'function') {
       output = result.toJs();
+    }
+    
+    // Explicitly release the Python memory space
+    namespace.destroy();
+    if (result && typeof result.destroy === 'function') {
+      result.destroy();
     }
 
     self.postMessage({ txId, type: 'RESULT', data: output });

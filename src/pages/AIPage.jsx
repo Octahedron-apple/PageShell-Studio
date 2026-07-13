@@ -6,42 +6,35 @@ import AIAssistant from '../components/AIAssistant.jsx';
 export default function AIPage() {
   const {
     files, selectedFiles, aiLogs, setAiLogs,
-    statusMessage, handleQuery, handleUpload,
-    handleToggleFileSelect, handleOpenFile,
     aiStreaming, ragStatus, ragIndices,
+    chatSessions, currentSessionId, handleStartNewChat, handleLoadChat, handleDeleteChat,
+    customSystemPrompt, setCustomSystemPrompt,
+    handleQuery, confirmTool
   } = useApp();
 
   return (
-    <div style={styles.page}>
+    <div className="flex w-full h-full overflow-hidden">
       {/* Right: Full-width AI chat */}
-      <main style={styles.aiPane}>
+      <main className="flex-1 overflow-hidden flex flex-col">
         <AIAssistant
           selectedFiles={selectedFiles}
           onQuery={handleQuery}
           aiLogs={aiLogs}
-          onClearLogs={() => setAiLogs([])}
-          statusMessage={statusMessage}
+          onClearLogs={handleStartNewChat}
           aiStreaming={aiStreaming}
           ragStatus={ragStatus}
           ragIndices={ragIndices}
+          chatSessions={chatSessions}
+          currentSessionId={currentSessionId}
+          onLoadChat={handleLoadChat}
+          onDeleteChat={handleDeleteChat}
+          onNewChat={handleStartNewChat}
+          customSystemPrompt={customSystemPrompt}
+          setCustomSystemPrompt={setCustomSystemPrompt}
+          confirmTool={confirmTool}
         />
       </main>
     </div>
   );
 }
 
-const styles = {
-  page: {
-    display: 'flex',
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-  },
-
-  aiPane: {
-    flex: 1,
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-};

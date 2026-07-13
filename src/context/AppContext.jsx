@@ -1,20 +1,30 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fileSystemAPI } from '../services/fs/fileSystem.js';
 import { runPython, subscribePythonLogs } from '../services/runtimes/pyodide.js';
 import { runJS } from '../services/runtimes/quickjs.js';
-import { generateCode, subscribeAIStatus } from '../services/ai/models.js';
+import { generateCode } from '../services/ai/models.js';
 import { indexDocument, retrieveChunks } from '../services/ai/rag.js';
+import { exportWorkspaceToZip, importWorkspaceFromZip } from '../utils/zipUtils.js';
+import { buildGlobalIndex, updateFileInIndex, removeFileFromIndex } from '../services/fs/search.js';
 import localforage from 'localforage';
 
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
-  // --- Navigation State ---
-  const [currentPage, setCurrentPage] = useState('editor');
+  const navigate = useNavigate();
+
+  // --- Theme State ---
+  const [activeMediaUrl, setActiveMediaUrl] = useState(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [theme, setTheme] = useState('dark'); // 'light' or 'dark'
 
   // --- Editor State ---
-  const [code, setCode] = useState('');
+  const [files, setFiles] = useState([]);
   const [activeFile, setActiveFile] = useState(null);
+  const [code, setCode] = useState('');
+  const [logs, setLogs] = useState([]);
+  const [activity, setActivity] = useState(null);
   const [loading, setLoading] = useState(false);
   const [runTarget, setRunTarget] = useState(null);
 
@@ -24,17 +34,109 @@ export function AppProvider({ children }) {
     }
   }, [activeFile]);
 
-  // --- File System State ---
-  const [files, setFiles] = useState([]);
+  // --- Global Hotkeys ---
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'p') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // --- Terminal Logs ---
-  const [logs, setLogs] = useState([]);
-
   // --- AI State ---
   const [selectedFiles, setSelectedFiles] = useState([]);
-  const [aiLogs, setAiLogs] = useState([]);
-  const [statusMessage, setStatusMessage] = useState('AI worker offline. Submit a query to trigger model loading.');
+  
+  const [chatSessions, setChatSessions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pageshell_ai_history');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error('Failed to load chat history', e);
+    }
+    return [];
+  });
+
+  const [currentSessionId, setCurrentSessionId] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pageshell_ai_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.length > 0) return parsed[0].id;
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return crypto.randomUUID();
+  });
+
+  const [aiLogs, setAiLogs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('pageshell_ai_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.length > 0) return parsed[0].logs || [];
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    if (aiLogs.length > 0) {
+      setChatSessions(prev => {
+        const existingIdx = prev.findIndex(s => s.id === currentSessionId);
+        let updated;
+        if (existingIdx >= 0) {
+          updated = [...prev];
+          updated[existingIdx] = { ...updated[existingIdx], logs: aiLogs, updatedAt: Date.now() };
+        } else {
+          const firstUserLog = aiLogs.find(l => l.sender === 'user');
+          const title = firstUserLog ? firstUserLog.text.substring(0, 40) + '...' : 'New Chat';
+          updated = [{ id: currentSessionId, title, logs: aiLogs, updatedAt: Date.now() }, ...prev];
+        }
+        localStorage.setItem('pageshell_ai_history', JSON.stringify(updated));
+        return updated;
+      });
+    }
+  }, [aiLogs, currentSessionId]);
+
+  const handleStartNewChat = () => {
+    setAiLogs([]);
+    setCurrentSessionId(crypto.randomUUID());
+  };
+
+  const handleLoadChat = (id) => {
+    const session = chatSessions.find(s => s.id === id);
+    if (session) {
+      setAiLogs(session.logs);
+      setCurrentSessionId(id);
+    }
+  };
+
+  const handleDeleteChat = (id) => {
+    setChatSessions(prev => {
+      const updated = prev.filter(s => s.id !== id);
+      localStorage.setItem('pageshell_ai_history', JSON.stringify(updated));
+      return updated;
+    });
+    if (id === currentSessionId) {
+      handleStartNewChat();
+    }
+  };
   const [aiStreaming, setAiStreaming] = useState(false);
+
+  const [customSystemPrompt, setCustomSystemPrompt] = useState(() => {
+    return localStorage.getItem('pageshell_system_prompt') || 'You are an offline coding assistant. Here is the relevant file context:';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('pageshell_system_prompt', customSystemPrompt);
+  }, [customSystemPrompt]);
 
   // --- RAG State ---
   // ragIndices: Map<filePath, MiniSearch index>
@@ -47,6 +149,8 @@ export function AppProvider({ children }) {
       const tree = await fileSystemAPI.getDirectoryTree();
       const workspaceNode = tree.find(node => node.name === 'workspace');
       setFiles(workspaceNode?.children ?? []);
+      // Ensure initial search index is built
+      buildGlobalIndex();
     } catch (err) {
       console.error('Failed to fetch OPFS file tree:', err);
     }
@@ -132,36 +236,31 @@ except Exception as e:
 
   // --- Actions ---
   const handleRun = async () => {
+    if (!runTarget) return;
     setLoading(true);
-
-    if (!runTarget) {
-      setLogs(prev => [...prev, { type: 'stderr', text: 'No script selected to run.' }]);
-      setLoading(false);
-      return;
-    }
-
-    const isPy = runTarget.endsWith('.py');
-    const isJs = runTarget.endsWith('.js');
-    setLogs(prev => [...prev, { type: 'info', text: `Executing ${isPy ? 'Python' : 'JavaScript'} script (${runTarget.split('/').pop()}) in sandbox...` }]);
+    setLogs([{ type: 'info', text: `Starting execution of ${runTarget}...` }]);
     
+    const startTime = Date.now();
+    setActivity({ 
+      id: startTime, 
+      title: `Running ${runTarget.split('/').pop()}`, 
+      status: 'running', 
+      startTime, 
+      logs: [] 
+    });
+
     try {
-      const fileContent = await fileSystemAPI.readFile(runTarget);
-      if (isPy) {
-        const result = await runPython(fileContent);
-        if (result !== undefined) {
-          setLogs(prev => [...prev, { type: 'success', text: `Execution completed. Return: ${JSON.stringify(result)}` }]);
-        }
-      } else if (isJs) {
-        const result = await runJS(fileContent);
-        if (result !== undefined) {
-          setLogs(prev => [...prev, { type: 'success', text: `Execution completed. Return: ${JSON.stringify(result)}` }]);
-        }
-      } else {
-        setLogs(prev => [...prev, { type: 'stderr', text: `Unsupported file type for execution: ${runTarget}` }]);
+      const content = await fileSystemAPI.readFile(runTarget);
+      if (runTarget.endsWith('.py')) {
+        await runPython(content);
+      } else if (runTarget.endsWith('.js')) {
+        await runJS(content);
       }
-      await refreshFiles();
+      setLogs(prev => [...prev, { type: 'success', text: `\nExecution completed successfully.` }]);
+      setActivity(prev => prev ? { ...prev, status: 'success', duration: Math.floor((Date.now() - prev.startTime) / 1000) } : null);
     } catch (err) {
-      setLogs(prev => [...prev, { type: 'stderr', text: err.message }]);
+      setLogs(prev => [...prev, { type: 'stderr', text: `\nExecution failed: ${err.message}` }]);
+      setActivity(prev => prev ? { ...prev, status: 'error', duration: Math.floor((Date.now() - prev.startTime) / 1000) } : null);
     } finally {
       setLoading(false);
     }
@@ -182,11 +281,72 @@ except Exception as e:
     reader.readAsArrayBuffer(file);
   };
 
+  const handleExportZip = async () => {
+    try {
+      setLogs(prev => [...prev, { type: 'info', text: `Exporting project to zip...` }]);
+      await exportWorkspaceToZip();
+      setLogs(prev => [...prev, { type: 'success', text: `Project exported successfully.` }]);
+    } catch (err) {
+      setLogs(prev => [...prev, { type: 'stderr', text: `Export failed: ${err.message}` }]);
+    }
+  };
+
+  const handleImportZip = async (file) => {
+    try {
+      setLogs(prev => [...prev, { type: 'info', text: `Importing project from ${file.name}...` }]);
+      await importWorkspaceFromZip(file);
+      await refreshFiles();
+      setLogs(prev => [...prev, { type: 'success', text: `Project imported successfully.` }]);
+    } catch (err) {
+      setLogs(prev => [...prev, { type: 'stderr', text: `Import failed: ${err.message}` }]);
+    }
+  };
+
+  const handleCreateFile = async (fileName) => {
+    if (!fileName) return;
+    const filePath = `workspace/${fileName}`;
+    try {
+      await fileSystemAPI.writeFile(filePath, new TextEncoder().encode(''));
+      setLogs(prev => [...prev, { type: 'success', text: `Created ${fileName}.` }]);
+      await refreshFiles();
+      updateFileInIndex(filePath);
+      handleOpenFile(filePath);
+    } catch (err) {
+      setLogs(prev => [...prev, { type: 'stderr', text: `Failed to create file: ${err.message}` }]);
+    }
+  };
+
   const handleOpenFile = async (filePath) => {
     const ext = filePath.split('.').pop().toLowerCase();
     
-    // Explicitly reject non-renderable media binaries
-    if (['png', 'jpg', 'jpeg', 'gif', 'whl', 'wasm', 'mp4', 'webp'].includes(ext)) {
+    // Explicitly handle media files
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg'].includes(ext)) {
+      try {
+        const bytes = await fileSystemAPI.readFileBinary(filePath);
+        
+        const mimeTypes = {
+          'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg',
+          'gif': 'image/gif', 'webp': 'image/webp', 'svg': 'image/svg+xml'
+        };
+        const blob = new Blob([bytes], { type: mimeTypes[ext] || 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        
+        setActiveMediaUrl(prev => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+        
+        setActiveFile(filePath);
+        setLogs(prev => [...prev, { type: 'info', text: `Opening ${filePath} in Media viewer.` }]);
+        navigate('/media');
+      } catch (err) {
+        setLogs(prev => [...prev, { type: 'stderr', text: `Failed to open media: ${err.message}` }]);
+      }
+      return;
+    }
+
+    // Explicitly reject other unrenderable binaries
+    if (['whl', 'wasm', 'mp4', 'zip', 'gz', 'tar'].includes(ext)) {
       setLogs(prev => [...prev, { type: 'stderr', text: `Cannot open binary file ${filePath} in editor.` }]);
       return;
     }
@@ -195,7 +355,7 @@ except Exception as e:
       if (['pdf', 'docx', 'xlsx', 'xls'].includes(ext)) {
         setActiveFile(filePath);
         setLogs(prev => [...prev, { type: 'info', text: `Opening ${filePath} in Documents viewer.` }]);
-        setCurrentPage('documents');
+        navigate('/documents');
         return;
       }
 
@@ -204,7 +364,7 @@ except Exception as e:
       setCode(content);
       setActiveFile(filePath);
       setLogs(prev => [...prev, { type: 'info', text: `Opened ${filePath} in editor.` }]);
-      setCurrentPage('editor');
+      navigate('/editor');
     } catch (err) {
       setLogs(prev => [...prev, { type: 'stderr', text: `Failed to open file: ${err.message}` }]);
     }
@@ -215,8 +375,25 @@ except Exception as e:
     try {
       await fileSystemAPI.writeFile(activeFile, new TextEncoder().encode(newCode));
       setLogs(prev => [...prev, { type: 'success', text: `Saved ${activeFile}.` }]);
+      updateFileInIndex(activeFile);
     } catch (err) {
       setLogs(prev => [...prev, { type: 'stderr', text: `Failed to save file: ${err.message}` }]);
+    }
+  };
+
+  const handleDeleteFile = async (path) => {
+    try {
+      await fileSystemAPI.deleteEntry(path);
+      if (activeFile === path) {
+        setActiveFile(null);
+        setCode('');
+      }
+      setSelectedFiles(prev => prev.filter(p => p !== path));
+      removeFileFromIndex(path);
+      await refreshFiles();
+      setLogs(prev => [...prev, { type: 'success', text: `Deleted ${path}.` }]);
+    } catch (err) {
+      setLogs(prev => [...prev, { type: 'stderr', text: `Failed to delete file: ${err.message}` }]);
     }
   };
 
@@ -244,9 +421,15 @@ except Exception as e:
         setRagStatus(`Indexing ${filename} for RAG...`);
         try {
           const bytes = await fileSystemAPI.readFileBinary(filePath);
-          const result = await indexDocument(bytes, filename);
+          const result = await indexDocument(bytes, filename, (progress) => {
+            if (progress.status === 'progress' || progress.status === 'downloading') {
+              setRagStatus(`Downloading semantic model: ${progress.name}...`);
+            } else {
+              setRagStatus(`Embedding ${filename} for RAG...`);
+            }
+          });
           if (result) {
-            newIndices.set(filePath, result.index);
+            newIndices.set(filePath, result);
             setRagStatus(`Indexed ${filename}: ${result.chunkCount} chunks`);
           } else {
             setRagStatus(`Could not index ${filename} (unsupported type or empty)`);
@@ -302,17 +485,33 @@ except Exception as e:
 
     let contextText = '';
 
-    // ── RAG Retrieval ──
-    // For any selected PDF/DOCX with a built index, retrieve the top relevant chunks.
+    // ── Semantic RAG Retrieval ──
     const ragExtensions = ['pdf', 'docx'];
-    const ragResults = [];
+    const allChunks = [];
     for (const filePath of selectedFiles) {
       const ext = filePath.toLowerCase().split('.').pop();
       if (ragExtensions.includes(ext) && ragIndices.has(filePath)) {
-        const index = ragIndices.get(filePath);
-        const chunks = retrieveChunks(index, queryText, 5);
-        ragResults.push(...chunks);
+        const indexResult = ragIndices.get(filePath);
+        if (indexResult.chunks) {
+          allChunks.push(...indexResult.chunks);
+        }
       }
+    }
+
+    let ragResults = [];
+    if (allChunks.length > 0) {
+      setRagStatus(`Searching documents semantically...`);
+      try {
+        ragResults = await retrieveChunks(allChunks, queryText, 5);
+      } catch (e) {
+        console.error("Semantic search error:", e);
+      }
+      
+      if (ragResults.length === 0 && allChunks.length > 0) {
+        ragResults.push({ text: allChunks[0].text, source: allChunks[0].source });
+      }
+      
+      setRagStatus('');
     }
     if (ragResults.length > 0) {
       contextText += '--- Relevant excerpts retrieved via RAG ---\n';
@@ -389,16 +588,7 @@ preview_excel()
       }
     ];
 
-    const systemPrompt = `You are an offline coding assistant. Here is the relevant file context:\n${contextText}
-
-You have access to the following tools:
-<tools>
-${JSON.stringify(tools, null, 2)}
-</tools>
-To use a tool, output a tool call using the following XML format. Stop generating text immediately after the closing tag.
-<tool_call>
-{"name": "tool_name", "args": {"arg_name": "arg_value"}}
-</tool_call>`;
+    const systemPrompt = `${customSystemPrompt}\n${contextText}`;
 
     const historyMessages = aiLogs
       .filter(log => log.sender === 'user' || log.sender === 'ai')
@@ -411,58 +601,81 @@ To use a tool, output a tool call using the following XML format. Stop generatin
     ];
 
     let currentMessages = requestMessages;
+    
+    // AI pending tool state hook inside Context
+    toolConfirmationResolveRef.current = null;
 
     while (true) {
       setAiLogs(prev => [...prev, { sender: 'ai', text: '' }]);
       
-      const { fullOutput } = await generateCodeAsync(currentMessages, (token) => {
+      const { fullOutput, tool_calls } = await generateCodeAsync(currentMessages, (token) => {
         setAiLogs(prev => {
           const next = [...prev];
           const last = next[next.length - 1];
           if (last?.sender === 'ai') next[next.length - 1] = { ...last, text: last.text + token };
           return next;
         });
-      }); // DO NOT pass `tools` parameter here because Qwen 1.5B does not support native tools.
+      }, tools);
 
-      let toolCallMatch;
-      if (typeof fullOutput === 'string') {
-        toolCallMatch = fullOutput.match(/<tool_call>([\s\S]*?)<\/tool_call>/);
-      }
-      
       let toolData = null;
-      if (toolCallMatch) {
-        try { toolData = JSON.parse(toolCallMatch[1].trim()); } catch(e){}
-      } else if (typeof fullOutput === 'string') {
-        // Fallback: If the model forgot the XML tags but returned valid JSON
+      let toolCallMatch = false;
+
+      if (tool_calls && tool_calls.length > 0) {
+        const tc = tool_calls[0];
         try {
-          const parsed = JSON.parse(fullOutput.trim());
-          if (parsed.name && parsed.args) {
-            toolData = parsed;
-          }
-        } catch(e){}
+          toolData = {
+            name: tc.function.name,
+            args: JSON.parse(tc.function.arguments)
+          };
+          toolCallMatch = true;
+        } catch (e) {
+          console.error("Failed to parse native tool arguments:", e);
+        }
+      } else if (typeof fullOutput === 'string') {
+        // Fallback string extraction if model returns raw JSON text
+        const jsonMatch = fullOutput.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed && parsed.name && parsed.args) {
+              toolData = parsed;
+              toolCallMatch = true;
+            }
+          } catch(e){}
+        }
       }
 
       if (toolData) {
+        setAiLogs(prev => [...prev, { sender: 'ai', pendingTool: toolData }]);
+
+        const isAccepted = await new Promise(resolve => {
+          toolConfirmationResolveRef.current = resolve;
+        });
+        
         let result = '';
-        try {
-          if (toolData.name === 'write_files') {
-            // Loop through the array of files and write each one
-            const writtenPaths = [];
-            for (const file of toolData.args.files) {
-              await fileSystemAPI.writeFile(`workspace/${file.path}`, new TextEncoder().encode(file.content));
-              writtenPaths.push(file.path);
+        
+        if (isAccepted) {
+          try {
+            if (toolData.name === 'write_files') {
+              const writtenPaths = [];
+              for (const file of toolData.args.files) {
+                await fileSystemAPI.writeFile(`workspace/${file.path}`, new TextEncoder().encode(file.content));
+                writtenPaths.push(file.path);
+              }
+              result = `Successfully wrote files: ${writtenPaths.join(', ')}`;
+              await refreshFiles();
+            } else if (toolData.name === 'run_python') {
+              const pyResult = await runPython(toolData.args.code);
+              result = `Python output: ${JSON.stringify(pyResult)}`;
+              await refreshFiles();
+            } else {
+              result = `Unknown tool: ${toolData.name}`;
             }
-            result = `Successfully wrote files: ${writtenPaths.join(', ')}`;
-            await refreshFiles();
-          } else if (toolData.name === 'run_python') {
-            const pyResult = await runPython(toolData.args.code);
-            result = `Python output: ${JSON.stringify(pyResult)}`;
-            await refreshFiles();
-          } else {
-            result = `Unknown tool: ${toolData.name}`;
+          } catch (err) {
+            result = `Error executing tool: ${err.message}`;
           }
-        } catch (err) {
-          result = `Error executing tool: ${err.message}`;
+        } else {
+           result = "User denied permission to execute this tool. Ask the user what they would like to do instead.";
         }
         
         currentMessages.push({ role: 'assistant', content: fullOutput });
@@ -472,7 +685,7 @@ To use a tool, output a tool call using the following XML format. Stop generatin
           const next = [...prev];
           const last = next[next.length - 1];
           if (last?.sender === 'ai') {
-            let cleaned = last.text.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
+            let cleaned = last.text.trim();
             if (!toolCallMatch && cleaned.startsWith('{') && cleaned.endsWith('}')) {
               cleaned = '';
             }
@@ -488,11 +701,28 @@ To use a tool, output a tool call using the following XML format. Stop generatin
     setAiStreaming(false);
   };
 
+  const toolConfirmationResolveRef = useRef(null);
+  
+  const confirmTool = (accepted) => {
+    if (toolConfirmationResolveRef.current) {
+      toolConfirmationResolveRef.current(accepted);
+      toolConfirmationResolveRef.current = null;
+    }
+  };
+
   // --- Lifecycle ---
   useEffect(() => {
-    refreshFiles().then(initializeDefaultWebFiles);
-    subscribePythonLogs(log => setLogs(prev => [...prev, { type: log.type, text: log.text }]));
-    subscribeAIStatus(status => setStatusMessage(status));
+    fileSystemAPI.clearTrash().then(() => {
+      refreshFiles().then(initializeDefaultWebFiles);
+    });
+    
+    subscribePythonLogs(log => {
+      setLogs(prev => [...prev, { type: log.type, text: log.text }]);
+      setActivity(prev => {
+        if (!prev || prev.status !== 'running') return prev;
+        return { ...prev, logs: [...(prev.logs || []), { type: log.type, text: log.text }] };
+      });
+    });
 
     // Hydrate state from localforage
     const hydrateState = async () => {
@@ -500,15 +730,27 @@ To use a tool, output a tool call using the following XML format. Stop generatin
         const savedFile = await localforage.getItem('activeFile');
         const savedCode = await localforage.getItem('code');
         const savedLogs = await localforage.getItem('logs');
-        if (savedFile) setActiveFile(savedFile);
-        if (savedCode) setCode(savedCode);
-        if (savedLogs) setLogs(savedLogs);
+        const savedTheme = await localforage.getItem('theme');
+        if (savedFile) setActiveFile(prev => prev === null ? savedFile : prev);
+        if (savedCode) setCode(prev => prev === '' ? savedCode : prev);
+        if (savedLogs) setLogs(prev => prev.length === 0 ? savedLogs : prev);
+        if (savedTheme) setTheme(savedTheme);
       } catch (err) {
         console.error('Failed to hydrate state from localforage:', err);
       }
     };
     hydrateState();
   }, []);
+
+  // Sync theme to localforage and document class
+  useEffect(() => {
+    localforage.setItem('theme', theme).catch(console.error);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   // Sync activeFile to localforage
   useEffect(() => {
@@ -552,14 +794,22 @@ To use a tool, output a tool call using the following XML format. Stop generatin
 
   return (
     <AppContext.Provider value={{
-      currentPage, setCurrentPage,
-      code, setCode, activeFile, setActiveFile, loading,
-      files, logs, setLogs,
-      selectedFiles, aiLogs, setAiLogs, statusMessage, aiStreaming,
-      runTarget, setRunTarget,
+      activeMediaUrl, setActiveMediaUrl,
+      isSearchOpen, setIsSearchOpen,
+      theme, setTheme,
+      files, setFiles, activeFile, setActiveFile, code, setCode, logs, setLogs, loading, setLoading, runTarget, setRunTarget,
+      activity, setActivity,
+      selectedFiles, aiLogs, setAiLogs, aiStreaming,
+      chatSessions, currentSessionId,
+      handleStartNewChat, handleLoadChat, handleDeleteChat,
       ragStatus, ragIndices,
-      handleRun, handleUpload, handleOpenFile, handleSaveFile,
+      handleRun,
+      handleCreateFile,
+      handleUpload, handleOpenFile, handleSaveFile, handleDeleteFile,
+      handleExportZip, handleImportZip,
       handleToggleFileSelect, handleQuery, refreshFiles, handleAutocomplete,
+      customSystemPrompt, setCustomSystemPrompt,
+      confirmTool
     }}>
       {children}
     </AppContext.Provider>
@@ -567,3 +817,5 @@ To use a tool, output a tool call using the following XML format. Stop generatin
 }
 
 export const useApp = () => useContext(AppContext);
+
+

@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:is(.dark *));
+
 *, *::before, *::after {
   box-sizing: border-box;
 }
@@ -9,12 +11,58 @@
 }
 
 :root {
+  /* LIGHT THEME VARIABLES */
+  --bg-app: #f4f4f5;
+  --bg-panel: #ffffff;
+  --bg-surface: #f8fafc;
+  --bg-surface-hover: #e2e8f0;
+  --bg-status: #e5e7eb;
+  
+  --border-color: #cbd5e1;
+  --border-color-light: #94a3b8;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  
+  --accent-primary: #3b82f6;
+  --accent-gradient: linear-gradient(90deg, #3b82f6 0%, #2563eb 100%);
+
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
+  --color-success: #10b981;
+  
   font-family: var(--font-sans);
   line-height: 1.5;
   font-weight: 400;
+  color-scheme: light;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+}
+
+:root.dark {
+  /* DARK THEME VARIABLES */
+  --bg-app: #121215;
+  --bg-panel: #16161a;
+  --bg-surface: #1a1a20;
+  --bg-surface-hover: #1f2937;
+  --bg-status: #0c0c0e;
+  
+  --border-color: #222228;
+  --border-color-light: #2d3748;
+  
+  --text-primary: #e5e7eb;
+  --text-secondary: #a0aec0;
+  --text-muted: #718096;
+  
+  --accent-primary: #4facfe;
+  --accent-gradient: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+
+  --color-error: #ff6b6b;
+  --color-warning: #f59e0b;
+  --color-success: #10b981;
+
   color-scheme: dark;
-  background-color: var(--color-zinc-950);
-  color: var(--color-zinc-100);
 }
 
 html, body, #root {
@@ -51,8 +99,8 @@ html, body, #root {
   margin-bottom: 0;
 }
 .markdown-body pre {
-  background-color: #1a1a20;
-  border: 1px solid #222228;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 12px;
   overflow-x: auto;
@@ -61,7 +109,7 @@ html, body, #root {
 .markdown-body code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 12px;
-  background-color: #1a1a20;
+  background-color: var(--bg-surface);
   padding: 2px 4px;
   border-radius: 4px;
 }

@@ -10,37 +10,39 @@ export default function Terminal({ logs, onClear }) {
   }, [logs]);
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <div style={styles.titleArea}>
-          <span style={styles.terminalIcon}>💻</span>
-          <span style={styles.title}>Terminal Output</span>
+    <div className="flex flex-col h-full bg-[var(--bg-status)] border-t border-[var(--border-color)] overflow-hidden font-mono">
+      <div className="flex justify-between items-center px-4 py-2 bg-[var(--bg-app)] border-b border-[var(--border-color)] text-xs font-bold text-[var(--text-muted)]">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm">💻</span>
+          <span className="tracking-[0.02em]">Terminal Output</span>
         </div>
-        <button onClick={onClear} style={styles.clearButton} id="terminal-clear-btn">
+        <button onClick={onClear} className="bg-transparent text-[var(--text-secondary)] text-[11px] cursor-pointer outline-none transition-colors duration-200 px-2 py-0.5 rounded border border-[var(--border-color)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]" id="terminal-clear-btn">
           Clear Logs
         </button>
       </div>
-      <div style={styles.body} id="terminal-log-body">
+      <div className="flex-1 p-4 overflow-y-auto text-[13px] leading-relaxed flex flex-col gap-1" id="terminal-log-body">
         {logs.length === 0 ? (
-          <div style={styles.emptyLogs}>Console idle. Press run to compile and execute Python code.</div>
+          <div className="text-[var(--text-muted)] italic text-xs">Console idle. Press run to compile and execute Python code.</div>
         ) : (
-          logs.map((log, index) => (
-            <div
-              key={index}
-              style={{
-                ...styles.line,
-                color: log.type === 'stderr' ? '#ff6b6b' :
-                       log.type === 'success' ? '#2ecc71' :
-                       log.type === 'info' ? '#3498db' : '#ecf0f1'
-              }}
-            >
-              {log.type === 'stdout' && <span style={styles.prefix}>[STDOUT]</span>}
-              {log.type === 'stderr' && <span style={styles.prefix}>[ERROR]</span>}
-              {log.type === 'info' && <span style={styles.prefix}>[SYSTEM]</span>}
-              {log.type === 'success' && <span style={styles.prefix}>[SUCCESS]</span>}
-              {log.text}
-            </div>
-          ))
+          logs.map((log, index) => {
+            let colorClass = 'text-[var(--text-primary)]';
+            if (log.type === 'stderr') colorClass = 'text-[var(--color-error)]';
+            else if (log.type === 'success') colorClass = 'text-[var(--color-success)]';
+            else if (log.type === 'info') colorClass = 'text-[var(--accent-primary)]';
+            
+            return (
+              <div
+                key={index}
+                className={`break-all whitespace-pre-wrap ${colorClass}`}
+              >
+                {log.type === 'stdout' && <span className="mr-2 opacity-50 text-[11px] font-bold">[STDOUT]</span>}
+                {log.type === 'stderr' && <span className="mr-2 opacity-50 text-[11px] font-bold">[ERROR]</span>}
+                {log.type === 'info' && <span className="mr-2 opacity-50 text-[11px] font-bold">[SYSTEM]</span>}
+                {log.type === 'success' && <span className="mr-2 opacity-50 text-[11px] font-bold">[SUCCESS]</span>}
+                {log.text}
+              </div>
+            );
+          })
         )}
         <div ref={terminalEndRef} />
       </div>
@@ -48,76 +50,3 @@ export default function Terminal({ logs, onClear }) {
   );
 }
 
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    backgroundColor: '#0c0c0e',
-    borderTop: '1px solid #222228',
-    overflow: 'hidden',
-    fontFamily: "'Fira Code', 'Courier New', Courier, monospace"
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '8px 16px',
-    backgroundColor: '#121215',
-    borderBottom: '1px solid #1a1a20',
-    fontSize: '12px',
-    fontWeight: '700',
-    color: '#718096'
-  },
-  titleArea: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px'
-  },
-  terminalIcon: {
-    fontSize: '14px'
-  },
-  title: {
-    letterSpacing: '0.02em'
-  },
-  clearButton: {
-    backgroundColor: 'transparent',
-    color: '#a0aec0',
-    fontSize: '11px',
-    cursor: 'pointer',
-    outline: 'none',
-    transition: 'color 0.2s',
-    padding: '2px 8px',
-    borderRadius: '4px',
-    border: '1px solid #222228',
-    '&:hover': {
-      color: '#fff',
-      backgroundColor: '#1a1a20'
-    }
-  },
-  body: {
-    flex: 1,
-    padding: '16px',
-    overflowY: 'auto',
-    fontSize: '13px',
-    lineHeight: '1.5',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '4px'
-  },
-  emptyLogs: {
-    color: '#4a5568',
-    fontStyle: 'italic',
-    fontSize: '12px'
-  },
-  line: {
-    wordBreak: 'break-all',
-    whiteSpace: 'pre-wrap'
-  },
-  prefix: {
-    marginRight: '8px',
-    opacity: 0.5,
-    fontSize: '11px',
-    fontWeight: '700'
-  }
-};

@@ -6,11 +6,11 @@ This document details exactly how the UI constructs the payload for the local AI
 
 | Property | Value |
 |----------|-------|
-| **Model ID** | `onnx-community/Qwen2.5-Coder-1.5B-Instruct` |
-| **Format** | ONNX (4-bit quantized, `dtype: 'q4'`) |
+| **Model ID** | `Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC` |
+| **Format** | WebLLM MLC compiled format (`q4f16_1`) |
 | **Size** | ~900MB (downloaded once, cached in browser IndexedDB) |
 | **Tuning** | Code-focused instruction following (Qwen2.5-Coder series) |
-| **Runtime** | `@huggingface/transformers` v3 — WebGPU with WASM CPU fallback |
+| **Runtime** | `@mlc-ai/web-llm` — WebGPU native with `@huggingface/transformers` CPU fallback |
 
 ## 1. How Context is Built (The Sliding Window)
 
@@ -47,48 +47,106 @@ It then strictly caps this array to the **last 6 messages** (`historyMessages.sl
 The system now supports **Tool Calling**, allowing the AI to break out of the chat UI and execute actions within the local PageShell Studio environment.
 
 ### Defined Protocols
-The AI is provided with JSON schemas for the following local capabilities injected directly into the System Prompt:
+The AI is provided with a standard OpenAI-compatible JSON schema array for local capabilities:
 - **`write_file`**: Instructs the `fileSystemAPI` worker to write string content to a specified path in the Origin Private File System (OPFS).
 - **`run_python`**: Instructs the `Pyodide` worker to evaluate a python script directly within the client-side WebAssembly sandbox.
 
 ### The Managed Execution Loop
-The `handleQuery` function is a managed `while(true)` execution loop:
-1. It requests the AI to generate a response.
-2. It awaits the full generation string and scans it for an XML tool call payload (e.g., `<tool_call>{"name": "write_file", "args": {...}}</tool_call>`).
-3. **If detected**, the loop intercepts the response, blocks UI output, parses the arguments, and executes the designated JavaScript function.
-4. The result of the function execution is appended to the message array inside a `<tool_response>` block, and the generation is re-triggered automatically.
+The system utilizes WebLLM's native OpenAI-compatible `tools` parameter support:
+1. It requests the AI to generate a response, passing the array of schemas via `request.tools`.
+2. The WebLLM worker streams back standard chunk deltas. It natively accumulates `chunk.choices[0].delta.tool_calls`.
+3. **If detected**, the loop receives the `tool_calls` array in the `COMPLETE` event, blocks UI output, parses the JSON arguments, and executes the designated JavaScript function.
+4. The result of the function execution is appended to the message array with `role: "tool"`, and the generation is re-triggered automatically.
 5. **If no tool calls are detected**, the loop breaks, and the final response is displayed to the user.
 
 ## 4. The Exact JSON Payload Structure
 
-The final array sent from the main thread to the Web Worker (`ai.worker.js`) — which is then passed directly into `Transformers.js` — follows the **ChatML instruction format** expected by the Qwen2.5 model family.
+The final request sent to the WebLLM engine (`ai.worker.js`) strictly mirrors the **OpenAI Chat Completions API** format.
 
 Here is the exact structure of the payload:
 
 ```json
-[
-  {
-    "role": "system",
-    "content": "You are an offline coding assistant. Here is the relevant file context:\n--- File: script.py ---\nimport pandas as pd\n# ... (up to 1500 chars of code) ...\n\nYou have access to the following tools:\n<tools>\n[\n  {\n    \"name\": \"write_file\",\n    \"description\": \"Write content to a file in the workspace\",\n    \"parameters\": {\n      \"path\": {\"type\": \"string\", \"description\": \"Filename, e.g. script.py\"},\n      \"content\": {\"type\": \"string\"}\n    }\n  }\n]\n</tools>\nTo use a tool, output a tool call using the following XML format. Stop generating text immediately after the closing tag.\n<tool_call>\n{\"name\": \"tool_name\", \"args\": {\"arg_name\": \"arg_value\"}}\n</tool_call>"
-  },
-  {
-    "role": "user",
-    "content": "Write a hello world script to hello.py"
-  },
-  {
-    "role": "assistant",
-    "content": "<tool_call>{\"name\": \"write_file\", \"args\": {\"path\": \"hello.py\", \"content\": \"print('Hello World')\"}}</tool_call>"
-  },
-  {
-    "role": "system",
-    "content": "<tool_response>Successfully wrote to hello.py</tool_response>"
-  },
-  {
-    "role": "assistant",
-    "content": "I have created the script for you!"
-  }
-]
+{
+  "messages": [
+    {
+      "role": "system",
+      "content": "You are an offline coding assistant. Here is the relevant file context:\n--- File: script.py ---\nimport pandas as pd\n# ... (up to 1500 chars of code) ..."
+    },
+    {
+      "role": "user",
+      "content": "Write a hello world script to hello.py"
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_calls": [
+        {
+          "id": "call_123",
+          "type": "function",
+          "function": {
+            "name": "write_file",
+            "arguments": "{\"path\": \"hello.py\", \"content\": \"print('Hello World')\"}"
+          }
+        }
+      ]
+    },
+    {
+      "role": "tool",
+      "tool_call_id": "call_123",
+      "content": "Successfully wrote to hello.py"
+    },
+    {
+      "role": "assistant",
+      "content": "I have created the script for you!"
+    }
+  ],
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "write_file",
+        "description": "Write content to a file in the workspace",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "path": {"type": "string"},
+            "content": {"type": "string"}
+          }
+        }
+      }
+    }
+  ]
+}
 ```
+
+## 5. Main-Thread to Worker Messaging Protocol
+
+To prevent cross-contamination of streams (e.g., if a user spams "Generate", or if a bulk process runs simultaneously with an autocomplete request), `models.js` and `ai.worker.js` communicate using a strict Request-ID protocol.
+
+### Outgoing Payload (Main to Worker)
+When requesting generation, the main thread assigns a unique `requestId` and passes it along with a `stream` flag:
+```json
+{
+  "action": "GENERATE",
+  "prompt": [...messages],
+  "tools": [...tools],
+  "stream": true,
+  "requestId": "req_1"
+}
+```
+- **`stream: true`**: Used for chat UI. Yields `TOKEN` events progressively.
+- **`stream: false`**: Used for the Bulk AI Action pipeline to prevent UI blocking. Skips `TOKEN` events and only returns `COMPLETE`.
+
+### Incoming Payload (Worker to Main)
+The Web Worker echoes the `requestId` back in every lifecycle event (`TOKEN`, `COMPLETE`, `ERROR`). `models.js` uses a dictionary map (`activeRequests`) to safely route incoming tokens to the correct callback function:
+```json
+{
+  "type": "TOKEN",
+  "token": "Hello",
+  "requestId": "req_1"
+}
+```
+This architecture guarantees that simultaneous LLM tasks safely manage their own state buffers without overwriting global variables.
 
 ## Troubleshooting "AI is not working"
 

@@ -21,13 +21,13 @@ export default function Preview({ htmlContent, cssContent, jsContent, onBack }) 
   `;
 
   return (
-    <div style={styles.container}>
+    <div className="flex flex-col w-screen h-screen bg-[#0f0f11] font-[Outfit,Inter,sans-serif]">
       {/* 7. Add a "Back to Editor" Interface */}
-      <div style={styles.header}>
-        <button onClick={onBack} style={styles.backButton}>
+      <div className="flex items-center px-6 py-3 bg-[#16161a] border-b border-[#222228] h-[56px] box-border">
+        <button onClick={onBack} className="bg-[#4facfe] bg-[linear-gradient(90deg,#4facfe_0%,#00f2fe_100%)] text-white border-none px-[18px] py-2 rounded-md cursor-pointer font-bold text-[13px] mr-5 shadow-[0_4px_12px_rgba(79,172,254,0.2)]">
           &larr; Back to Editor
         </button>
-        <span style={styles.title}>Live Web Preview</span>
+        <span className="text-[#e2e8f0] font-bold text-base">Live Web Preview</span>
       </div>
       
       {/* 6. Render the Secure Iframe */}
@@ -35,52 +35,9 @@ export default function Preview({ htmlContent, cssContent, jsContent, onBack }) 
         title="preview"
         srcDoc={srcDoc}
         sandbox="allow-scripts"
-        style={styles.iframe}
+        className="flex-1 w-full border-none bg-white"
       />
     </div>
   );
 }
 
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    width: '100vw',
-    height: '100vh',
-    backgroundColor: '#0f0f11',
-    fontFamily: "'Outfit', 'Inter', sans-serif"
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '12px 24px',
-    backgroundColor: '#16161a',
-    borderBottom: '1px solid #222228',
-    height: '56px',
-    boxSizing: 'border-box'
-  },
-  backButton: {
-    backgroundColor: '#4facfe',
-    backgroundImage: 'linear-gradient(90deg, #4facfe 0%, #00f2fe 100%)',
-    color: '#fff',
-    border: 'none',
-    padding: '8px 18px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: '700',
-    fontSize: '13px',
-    marginRight: '20px',
-    boxShadow: '0 4px 12px rgba(79, 172, 254, 0.2)',
-  },
-  title: {
-    color: '#e2e8f0',
-    fontWeight: '700',
-    fontSize: '16px'
-  },
-  iframe: {
-    flex: 1,
-    width: '100%',
-    border: 'none',
-    backgroundColor: '#ffffff'
-  }
-};

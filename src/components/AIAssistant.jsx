@@ -1,9 +1,96 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { subscribeAIStatus } from '../services/ai/models.js';
 
-export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLogs, statusMessage, aiStreaming, ragStatus, ragIndices }) {
+export default function AIAssistant({ 
+  selectedFiles, onQuery, aiLogs, onClearLogs, aiStreaming, ragStatus, ragIndices,
+  chatSessions = [], currentSessionId, onLoadChat, onDeleteChat, onNewChat, customSystemPrompt, setCustomSystemPrompt,
+  confirmTool
+}) {
   const [query, setQuery] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [whisperStatus, setWhisperStatus] = useState('');
+  const [showHistory, setShowHistory] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const [statusMessage, setStatusMessage] = useState('AI worker offline. Submit a query to trigger model loading.');
+  
+  useEffect(() => {
+    subscribeAIStatus(status => setStatusMessage(status));
+  }, []);
+
   const logsEndRef = useRef(null);
+  const whisperWorkerRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const audioChunksRef = useRef([]);
+
+  // Initialize Whisper Worker
+  useEffect(() => {
+    const worker = new Worker(new URL('../services/ai/whisper.worker.js', import.meta.url), { type: 'module' });
+    whisperWorkerRef.current = worker;
+    
+    worker.onmessage = (e) => {
+      const { type, text, status } = e.data;
+      if (type === 'STATUS') {
+        setWhisperStatus(status);
+      } else if (type === 'TRANSCRIPTION_CHUNK') {
+        setQuery(prev => (prev + ' ' + text).trim());
+      } else if (type === 'TRANSCRIPTION_COMPLETE') {
+        // Could handle complete state here
+      }
+    };
+    
+    worker.postMessage({ type: 'LOAD_MODEL', payload: { modelId: 'tiny' } });
+
+    return () => worker.terminate();
+  }, []);
+
+  const toggleRecording = async () => {
+    if (isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+        streamRef.current?.getTracks().forEach(t => t.stop());
+      }
+      setIsRecording(false);
+    } else {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+        setIsRecording(true);
+        setWhisperStatus('Recording audio...');
+        
+        const recorder = new MediaRecorder(stream);
+        audioChunksRef.current = [];
+        
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) audioChunksRef.current.push(e.data);
+        };
+        
+        recorder.onstop = async () => {
+          setWhisperStatus('Processing audio...');
+          try {
+            const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+            const arrayBuffer = await blob.arrayBuffer();
+            
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+            const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            const float32Data = audioBuffer.getChannelData(0);
+            
+            whisperWorkerRef.current?.postMessage({ type: 'TRANSCRIBE', payload: { audioData: float32Data } });
+          } catch (err) {
+            console.error('Audio processing failed:', err);
+            setWhisperStatus('Audio processing failed');
+          }
+        };
+        
+        recorder.start();
+        mediaRecorderRef.current = recorder;
+      } catch (err) {
+        console.error('Error accessing microphone', err);
+        setWhisperStatus('Microphone access denied');
+      }
+    }
+  };
 
   useEffect(() => {
     if (logsEndRef.current) {
@@ -19,35 +106,82 @@ export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLog
   };
 
   return (
-    <div style={styles.container}>
+    <div className="flex flex-col h-full bg-[var(--bg-app)] box-border">
       {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.titleArea}>
-          <span style={styles.aiIcon}>🤖</span>
-          <span style={styles.title}>Local AI Assistant</span>
+      <div className="flex justify-between items-center px-5 py-3 bg-[var(--bg-panel)] border-b border-[var(--border-color)]">
+        <div className="flex items-center gap-2">
+          <span className="text-base">🤖</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">Local AI Assistant</span>
         </div>
-        <button onClick={onClearLogs} style={styles.clearButton} id="ai-clear-btn">
-          Clear
-        </button>
+        <div className="flex gap-2">
+          <button onClick={() => { setShowPrompt(!showPrompt); setShowHistory(false); }} className="bg-transparent text-[var(--text-secondary)] text-[11px] cursor-pointer outline-none border border-[var(--border-color)] rounded px-2 py-0.5 hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]">
+            {showPrompt ? 'Back' : '⚙️ Prompt'}
+          </button>
+          <button onClick={() => { setShowHistory(!showHistory); setShowPrompt(false); }} className="bg-transparent text-[var(--text-secondary)] text-[11px] cursor-pointer outline-none border border-[var(--border-color)] rounded px-2 py-0.5 hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]">
+            {showHistory ? 'Back' : '📜 History'}
+          </button>
+          <button onClick={() => { onNewChat?.(); setShowHistory(false); setShowPrompt(false); }} className="bg-transparent text-[var(--text-secondary)] text-[11px] cursor-pointer outline-none border border-[var(--border-color)] rounded px-2 py-0.5 hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]">
+            New Chat
+          </button>
+        </div>
       </div>
 
-      {/* Selected Context Summary */}
-      <div style={styles.contextSummary}>
-        <span style={styles.contextLabel}>Context Ingestion:</span>
+      {showHistory ? (
+        <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-2">
+          <h3 className="text-[var(--text-primary)] text-sm font-bold m-0 mb-2">Chat History</h3>
+          {chatSessions.length === 0 ? (
+            <div className="text-[var(--text-muted)] text-xs">No previous chats found.</div>
+          ) : (
+            chatSessions.map(session => (
+              <div 
+                key={session.id} 
+                className={`flex justify-between items-center p-3 rounded border cursor-pointer transition-colors ${currentSessionId === session.id ? 'bg-[var(--bg-surface-hover)] border-[var(--accent-primary)]' : 'bg-[var(--bg-panel)] border-[var(--border-color)] hover:border-[var(--text-muted)]'}`}
+                onClick={() => { onLoadChat(session.id); setShowHistory(false); }}
+              >
+                <div className="flex flex-col gap-1 overflow-hidden pr-2">
+                  <span className="text-[13px] text-[var(--text-primary)] font-semibold truncate">{session.title}</span>
+                  <span className="text-[10px] text-[var(--text-muted)]">{new Date(session.updatedAt).toLocaleString()}</span>
+                </div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onDeleteChat(session.id); }}
+                  className="bg-transparent border-none text-[var(--text-muted)] hover:text-red-500 cursor-pointer p-1 shrink-0"
+                  title="Delete chat"
+                >
+                  🗑️
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+      ) : showPrompt ? (
+        <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-3">
+          <h3 className="text-[var(--text-primary)] text-sm font-bold m-0 mb-1">System Prompt</h3>
+          <p className="text-xs text-[var(--text-muted)] m-0 mb-2">Edit the core instructions that guide the AI assistant's behavior.</p>
+          <textarea 
+            value={customSystemPrompt}
+            onChange={(e) => setCustomSystemPrompt(e.target.value)}
+            className="w-full flex-1 bg-[var(--bg-panel)] border border-[var(--border-color)] text-[var(--text-primary)] p-3 text-sm rounded focus:outline-none focus:border-indigo-500 resize-none font-mono"
+          />
+        </div>
+      ) : (
+        <>
+          {/* Selected Context Summary */}
+          <div className="px-4 py-2 bg-[var(--bg-surface)] border-b border-[var(--border-color)] text-xs flex gap-1.5 items-center overflow-hidden">
+        <span className="text-[var(--text-muted)] font-bold">Context Ingestion:</span>
         {selectedFiles.length === 0 ? (
-          <span style={styles.noContext}>None (check files in sidebar to attach)</span>
+          <span className="text-[var(--text-muted)] italic">None (check files in sidebar to attach)</span>
         ) : (
-          <span style={styles.activeContext}>{selectedFiles.map(f => f.split('/').pop()).join(', ')}</span>
+          <span className="text-[var(--accent-primary)] font-semibold truncate">{selectedFiles.map(f => f.split('/').pop()).join(', ')}</span>
         )}
       </div>
 
       {/* RAG Indexing Status */}
       {ragStatus && (
-        <div style={styles.ragStatusBar}>
-          <span style={styles.ragDot} />
-          <span style={styles.ragStatusText}>{ragStatus}</span>
+        <div className="flex items-center gap-2 px-4 py-1.5 bg-[rgba(99,179,237,0.06)] border-b border-[rgba(99,179,237,0.15)] text-[11px] shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#63b3ed] shadow-[0_0_6px_#63b3ed] shrink-0 animate-pulse" />
+          <span className="text-[#63b3ed] flex-1 truncate">{ragStatus}</span>
           {ragIndices && ragIndices.size > 0 && (
-            <span style={styles.ragBadge}>📚 {ragIndices.size} indexed</span>
+            <span className="text-[10px] text-[#4facfe] bg-[rgba(79,172,254,0.1)] border border-[rgba(79,172,254,0.25)] px-[7px] py-[2px] rounded-[10px] shrink-0">📚 {ragIndices.size} indexed</span>
           )}
         </div>
       )}
@@ -56,36 +190,70 @@ export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLog
       {(() => {
         const isDownloading = statusMessage && statusMessage.includes('Downloading');
         return (
-          <div style={{ ...styles.statusBar, ...(isDownloading ? styles.statusBarActive : {}) }}>
-            <span style={{ ...styles.statusDot, ...(isDownloading ? styles.statusDotActive : {}) }} />
-            <span style={styles.statusText}>{statusMessage || 'AI worker offline. Send a query to load the model.'}</span>
-            {isDownloading && (
-              <span style={styles.downloadingBadge}>↓ Downloading</span>
+          <div className={`flex flex-col gap-1 px-4 py-[7px] bg-[var(--bg-status)] border-b border-[var(--border-color)] text-[11px] transition-colors duration-300 shrink-0 ${isDownloading ? 'bg-[rgba(245,158,11,0.08)] border-b border-[rgba(245,158,11,0.25)]' : ''}`}>
+            <div className="flex items-center gap-2">
+              <span className={`w-1.5 h-1.5 rounded-full bg-[#3498db] shadow-[0_0_6px_#3498db] shrink-0 ${isDownloading ? 'bg-[var(--color-warning)] shadow-[0_0_8px_var(--color-warning)]' : ''}`} />
+              <span className="text-[var(--text-muted)] flex-1 truncate">{statusMessage || 'AI worker offline. Send a query to load the model.'}</span>
+              {isDownloading && (
+                <span className="text-[10px] font-bold text-[var(--color-warning)] bg-[rgba(245,158,11,0.12)] border border-[rgba(245,158,11,0.3)] px-[7px] py-[2px] rounded-[10px] shrink-0">↓ Downloading</span>
+              )}
+            </div>
+            {whisperStatus && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`w-1.5 h-1.5 rounded-full ${isRecording ? 'bg-red-500 shadow-[0_0_6px_#ef4444] animate-pulse' : 'bg-emerald-500 shadow-[0_0_6px_#10b981]'} shrink-0`} />
+                <span className="text-[var(--text-muted)] flex-1 truncate">Whisper: {whisperStatus}</span>
+              </div>
             )}
           </div>
         );
       })()}
 
       {/* AI Log Output */}
-      <div style={styles.chatArea} id="ai-chat-body">
+      <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-3" id="ai-chat-body">
         {aiLogs.length === 0 ? (
-          <div style={styles.introCard}>
-            <h4 style={styles.introTitle}>Qwen2.5-Coder 0.5B Instruct</h4>
-            <p style={styles.introText}>
-              Your offline code assistant runs 100% in a background WebGPU/WASM worker.
-              On first use, ~350MB of model weights are downloaded and cached in your browser's IndexedDB.
+          <div className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-lg p-4 mt-2.5">
+            <h4 className="m-0 mb-2 text-sm text-[var(--accent-primary)]">Qwen2.5-Coder 1.5B Instruct</h4>
+            <p className="m-0 text-xs text-[var(--text-muted)] leading-relaxed">
+              Offline WebGPU assistant. ~900MB of weights are downloaded and cached on first use.
               Check files in the sidebar to attach them as context.
             </p>
           </div>
         ) : (
           aiLogs.map((msg, idx) => (
-            <div key={idx} style={msg.sender === 'user' ? styles.userMessage : styles.aiMessage}>
-              <div style={styles.messageHeader}>
+            <div key={idx} className={msg.sender === 'user' ? "self-end bg-[var(--bg-surface-hover)] text-[var(--text-primary)] rounded-t-lg rounded-bl-lg rounded-br-none px-3.5 py-2.5 max-w-[85%] box-border" : "self-start bg-[var(--bg-panel)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-t-lg rounded-br-lg rounded-bl-none px-3.5 py-2.5 max-w-[85%] box-border"}>
+              <div className="text-[11px] text-[var(--text-secondary)] mb-1">
                 <strong>{msg.sender === 'user' ? 'You' : 'Assistant'}</strong>
               </div>
-              <div style={styles.messageContent} className={msg.sender === 'user' ? '' : 'markdown-body'}>
-                {msg.sender === 'user' ? msg.text : <ReactMarkdown>{msg.text}</ReactMarkdown>}
-              </div>
+              
+              {msg.pendingTool ? (
+                <div className="bg-[var(--bg-app)] border border-amber-500/30 rounded-lg p-3 mt-2">
+                  <div className="flex items-center gap-2 mb-2 text-amber-500 font-bold text-xs uppercase tracking-wide">
+                    <span>⚠️ Pending Action:</span>
+                    <span>{msg.pendingTool.name}</span>
+                  </div>
+                  <div className="bg-black/20 p-2 rounded text-xs font-mono text-[var(--text-secondary)] mb-3 overflow-x-auto max-h-32">
+                    {JSON.stringify(msg.pendingTool.args, null, 2)}
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => confirmTool(false)}
+                      className="flex-1 py-1.5 rounded bg-zinc-800 text-zinc-300 hover:bg-red-900/50 hover:text-red-300 transition-colors border border-zinc-700 text-xs font-bold"
+                    >
+                      Reject
+                    </button>
+                    <button 
+                      onClick={() => confirmTool(true)}
+                      className="flex-1 py-1.5 rounded bg-amber-600 text-white hover:bg-amber-500 transition-colors border-none text-xs font-bold shadow-lg shadow-amber-900/20"
+                    >
+                      Allow
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className={`text-[13px] leading-relaxed break-words whitespace-pre-wrap ${msg.sender === 'user' ? '' : 'markdown-body'}`}>
+                  {msg.sender === 'user' ? msg.text : <ReactMarkdown>{msg.text}</ReactMarkdown>}
+                </div>
+              )}
             </div>
           ))
         )}
@@ -93,268 +261,29 @@ export default function AIAssistant({ selectedFiles, onQuery, aiLogs, onClearLog
       </div>
 
       {/* Input Form */}
-      <form onSubmit={handleSubmit} style={styles.form}>
+      <form onSubmit={handleSubmit} className="flex px-4 py-3 bg-[var(--bg-panel)] border-t border-[var(--border-color)] gap-2">
+        <button 
+          type="button"
+          onClick={toggleRecording}
+          className={`flex items-center justify-center w-9 h-9 rounded-md border ${isRecording ? 'bg-red-500/10 border-red-500/30 text-red-500' : 'bg-[var(--bg-surface)] border-[var(--border-color)] text-[var(--text-secondary)]'} hover:bg-[var(--bg-surface-hover)] transition-colors cursor-pointer outline-none`}
+          title={isRecording ? "Stop Recording" : "Start Voice Input"}
+        >
+          {isRecording ? '⏹' : '🎤'}
+        </button>
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={aiStreaming ? "AI is typing..." : "Ask AI about selected files..."}
-          style={{ ...styles.input, ...(aiStreaming ? styles.inputDisabled : {}) }}
+          className={`flex-1 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-md text-[var(--text-primary)] px-3 py-2 text-[13px] outline-none placeholder:text-[var(--text-muted)] ${aiStreaming ? 'bg-[var(--bg-panel)] text-[var(--text-muted)] cursor-not-allowed' : ''}`}
           disabled={aiStreaming}
           id="ai-query-input"
         />
-        <button type="submit" style={styles.sendButton} id="ai-send-btn" disabled={aiStreaming}>
+        <button type="submit" className="bg-[var(--accent-primary)] bg-[image:var(--accent-gradient)] text-white border-none rounded-md px-4 py-2 text-[13px] font-bold cursor-pointer outline-none transition-opacity duration-200 hover:opacity-90" id="ai-send-btn" disabled={aiStreaming}>
           {aiStreaming ? 'Working...' : 'Ask'}
         </button>
       </form>
+      </>)}
     </div>
   );
 }
-
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    backgroundColor: '#121215',
-    boxSizing: 'border-box'
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '12px 20px',
-    backgroundColor: '#16161a',
-    borderBottom: '1px solid #222228'
-  },
-  titleArea: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
-  },
-  aiIcon: {
-    fontSize: '16px'
-  },
-  title: {
-    fontSize: '14px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    color: '#cbd5e0'
-  },
-  clearButton: {
-    backgroundColor: 'transparent',
-    color: '#a0aec0',
-    fontSize: '11px',
-    cursor: 'pointer',
-    outline: 'none',
-    border: '1px solid #222228',
-    borderRadius: '4px',
-    padding: '2px 8px',
-    '&:hover': {
-      color: '#fff',
-      backgroundColor: '#1a1a20'
-    }
-  },
-  contextSummary: {
-    padding: '8px 16px',
-    backgroundColor: '#1a1a20',
-    borderBottom: '1px solid #222228',
-    fontSize: '12px',
-    display: 'flex',
-    gap: '6px',
-    alignItems: 'center',
-    overflow: 'hidden'
-  },
-  contextLabel: {
-    color: '#718096',
-    fontWeight: '700'
-  },
-  noContext: {
-    color: '#4a5568',
-    fontStyle: 'italic'
-  },
-  activeContext: {
-    color: '#00f2fe',
-    fontWeight: '600',
-    textOverflow: 'ellipsis',
-    overflow: 'hidden',
-    whiteSpace: 'nowrap'
-  },
-  statusBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '7px 16px',
-    backgroundColor: '#0c0c0e',
-    borderBottom: '1px solid #222228',
-    fontSize: '11px',
-    transition: 'background-color 0.3s',
-    flexShrink: 0,
-  },
-  statusBarActive: {
-    backgroundColor: 'rgba(245, 158, 11, 0.08)',
-    borderBottom: '1px solid rgba(245, 158, 11, 0.25)',
-  },
-  statusDot: {
-    width: '6px',
-    height: '6px',
-    borderRadius: '50%',
-    backgroundColor: '#3498db',
-    boxShadow: '0 0 6px #3498db',
-    flexShrink: 0,
-  },
-  statusDotActive: {
-    backgroundColor: '#f59e0b',
-    boxShadow: '0 0 8px #f59e0b',
-  },
-  statusText: {
-    color: '#718096',
-    flex: 1,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  downloadingBadge: {
-    fontSize: '10px',
-    fontWeight: '700',
-    color: '#f59e0b',
-    backgroundColor: 'rgba(245, 158, 11, 0.12)',
-    border: '1px solid rgba(245, 158, 11, 0.3)',
-    padding: '2px 7px',
-    borderRadius: '10px',
-    flexShrink: 0,
-  },
-  ragStatusBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '5px 16px',
-    backgroundColor: 'rgba(99, 179, 237, 0.06)',
-    borderBottom: '1px solid rgba(99, 179, 237, 0.15)',
-    fontSize: '11px',
-    flexShrink: 0,
-  },
-  ragDot: {
-    width: '6px',
-    height: '6px',
-    borderRadius: '50%',
-    backgroundColor: '#63b3ed',
-    boxShadow: '0 0 6px #63b3ed',
-    flexShrink: 0,
-    animation: 'pulse 1.5s infinite',
-  },
-  ragStatusText: {
-    color: '#63b3ed',
-    flex: 1,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  ragBadge: {
-    fontSize: '10px',
-    color: '#4facfe',
-    backgroundColor: 'rgba(79, 172, 254, 0.1)',
-    border: '1px solid rgba(79, 172, 254, 0.25)',
-    padding: '2px 7px',
-    borderRadius: '10px',
-    flexShrink: 0,
-  },
-  chatArea: {
-    flex: 1,
-    padding: '16px',
-    overflowY: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px'
-  },
-  introCard: {
-    backgroundColor: '#16161a',
-    border: '1px solid #222228',
-    borderRadius: '8px',
-    padding: '16px',
-    marginTop: '10px'
-  },
-  introTitle: {
-    margin: '0 0 8px 0',
-    fontSize: '14px',
-    color: '#4facfe'
-  },
-  introText: {
-    margin: 0,
-    fontSize: '12px',
-    color: '#718096',
-    lineHeight: '1.5'
-  },
-  userMessage: {
-    alignSelf: 'flex-end',
-    backgroundColor: '#1f2937',
-    color: '#f3f4f6',
-    borderRadius: '8px 8px 0 8px',
-    padding: '10px 14px',
-    maxWidth: '85%',
-    boxSizing: 'border-box'
-  },
-  aiMessage: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#16161a',
-    color: '#e5e7eb',
-    border: '1px solid #222228',
-    borderRadius: '8px 8px 8px 0',
-    padding: '10px 14px',
-    maxWidth: '85%',
-    boxSizing: 'border-box'
-  },
-  messageHeader: {
-    fontSize: '11px',
-    color: '#9ca3af',
-    marginBottom: '4px'
-  },
-  messageContent: {
-    fontSize: '13px',
-    lineHeight: '1.5',
-    wordBreak: 'break-word',
-    whiteSpace: 'pre-wrap'
-  },
-  form: {
-    display: 'flex',
-    padding: '12px 16px',
-    backgroundColor: '#16161a',
-    borderTop: '1px solid #222228',
-    gap: '8px'
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#1a1a1e',
-    border: '1px solid #222228',
-    borderRadius: '6px',
-    color: '#e2e8f0',
-    padding: '8px 12px',
-    fontSize: '13px',
-    outline: 'none',
-    '&::placeholder': {
-      color: '#4a5568'
-    }
-  },
-  inputDisabled: {
-    backgroundColor: '#16161a',
-    color: '#718096',
-    cursor: 'not-allowed'
-  },
-  sendButton: {
-    backgroundColor: '#4facfe',
-    backgroundImage: 'linear-gradient(90deg, #4facfe 0%, #00f2fe 100%)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '6px',
-    padding: '8px 16px',
-    fontSize: '13px',
-    fontWeight: '700',
-    cursor: 'pointer',
-    outline: 'none',
-    transition: 'opacity 0.2s',
-    '&:hover': {
-      opacity: 0.9
-    }
-  }
-};

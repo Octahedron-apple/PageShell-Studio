@@ -37,11 +37,11 @@ export default function PreviewPage() {
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.toolbar}>
-        <span style={styles.toolbarTitle}>🌐 Live Web Preview</span>
+    <div className="flex flex-col w-full h-full overflow-hidden bg-[var(--bg-app)]">
+      <div className="flex items-center justify-between px-6 py-2.5 bg-[var(--bg-panel)] border-b border-[var(--border-color)] h-[52px] box-border shrink-0">
+        <span className="text-sm font-bold text-[var(--text-secondary)] uppercase tracking-wider">🌐 Live Web Preview</span>
         <button
-          style={{ ...styles.btn, opacity: loading ? 0.6 : 1 }}
+          className={`bg-[var(--accent-gradient)] text-[var(--accent-text)] border-none px-5 py-2 rounded-md cursor-pointer font-bold text-[13px] shadow-[0_4px_12px_rgba(79,172,254,0.25)] ${loading ? 'opacity-60' : 'opacity-100'}`}
           onClick={handleLoad}
           disabled={loading}
         >
@@ -54,16 +54,16 @@ export default function PreviewPage() {
           title="preview"
           srcDoc={srcDoc}
           sandbox="allow-scripts"
-          style={styles.iframe}
+          className="flex-1 w-full border-none bg-white"
         />
       ) : (
-        <div style={styles.empty}>
-          <div style={styles.emptyIcon}>🌐</div>
-          <p style={styles.emptyTitle}>No preview loaded</p>
-          <p style={styles.emptySubtext}>
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 text-[var(--text-primary)]">
+          <div className="text-[64px]">🌐</div>
+          <p className="text-[22px] font-bold m-0 text-[var(--text-secondary)]">No preview loaded</p>
+          <p className="text-sm text-[var(--text-muted)] text-center max-w-[400px] leading-relaxed m-0">
             Edit your HTML, CSS & JS in the Editor, then click <strong>Launch Preview</strong> to see it rendered here.
           </p>
-          <button style={styles.btn} onClick={handleLoad} disabled={loading}>
+          <button className="bg-[var(--accent-gradient)] text-[var(--accent-text)] border-none px-5 py-2 rounded-md cursor-pointer font-bold text-[13px] shadow-[0_4px_12px_rgba(79,172,254,0.25)]" onClick={handleLoad} disabled={loading}>
             {loading ? 'Loading...' : 'Launch Preview'}
           </button>
         </div>
@@ -72,74 +72,3 @@ export default function PreviewPage() {
   );
 }
 
-const styles = {
-  page: {
-    display: 'flex',
-    flexDirection: 'column',
-    width: '100%',
-    height: '100%',
-    overflow: 'hidden',
-    backgroundColor: '#0f0f11',
-  },
-  toolbar: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '10px 24px',
-    backgroundColor: '#121215',
-    borderBottom: '1px solid #222228',
-    height: '52px',
-    boxSizing: 'border-box',
-    flexShrink: 0,
-  },
-  toolbarTitle: {
-    fontSize: '14px',
-    fontWeight: '700',
-    color: '#a0aec0',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-  },
-  btn: {
-    background: 'linear-gradient(90deg, #4facfe 0%, #00f2fe 100%)',
-    color: '#fff',
-    border: 'none',
-    padding: '8px 20px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: '700',
-    fontSize: '13px',
-    boxShadow: '0 4px 12px rgba(79, 172, 254, 0.25)',
-  },
-  iframe: {
-    flex: 1,
-    width: '100%',
-    border: 'none',
-    backgroundColor: '#fff',
-  },
-  empty: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '12px',
-    color: '#e2e8f0',
-  },
-  emptyIcon: {
-    fontSize: '64px',
-  },
-  emptyTitle: {
-    fontSize: '22px',
-    fontWeight: '700',
-    margin: 0,
-    color: '#cbd5e0',
-  },
-  emptySubtext: {
-    fontSize: '14px',
-    color: '#718096',
-    textAlign: 'center',
-    maxWidth: '400px',
-    lineHeight: 1.6,
-    margin: 0,
-  },
-};

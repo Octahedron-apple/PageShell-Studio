@@ -56,7 +56,8 @@ self.onmessage = async (event) => {
   } finally {
     // Explicitly dispose resources to prevent memory leaks in WASM linear memory
     if (result) {
-      result.dispose();
+      if (result.value) result.value.dispose();
+      if (result.error) result.error.dispose();
     }
     if (vm) {
       vm.dispose();

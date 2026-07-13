@@ -143,31 +143,31 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <div style={styles.title}>
+    <div className="flex flex-col h-full bg-[var(--bg-app)] text-[var(--text-primary)]">
+      <div className="flex justify-between items-center px-5 py-3 bg-[var(--bg-panel)] border-b border-[var(--border-color)]">
+        <div className="text-sm font-semibold">
           📄 {activeFile ? activeFile.split('/').pop() : 'No file selected'}
         </div>
         {activeFile && fileType !== 'unsupported' && (
-          <div style={styles.toolbar}>
-            <button style={styles.btn} onClick={exportToPDF}>Export PDF</button>
-            <button style={styles.btn} onClick={exportToDocx}>Export DOCX</button>
+          <div className="flex gap-2">
+            <button className="bg-[var(--accent-primary)] text-[var(--accent-text)] border-none px-3 py-1.5 rounded cursor-pointer text-xs font-semibold" onClick={exportToPDF}>Export PDF</button>
+            <button className="bg-[var(--accent-primary)] text-[var(--accent-text)] border-none px-3 py-1.5 rounded cursor-pointer text-xs font-semibold" onClick={exportToDocx}>Export DOCX</button>
           </div>
         )}
       </div>
 
-      <div style={styles.viewerContainer} ref={viewerRef}>
+      <div className="flex-1 overflow-auto p-5" ref={viewerRef}>
         {loading ? (
-          <div style={styles.message}>Loading document...</div>
+          <div className="text-center text-[var(--text-muted)] mt-10 italic">Loading document...</div>
         ) : !activeFile ? (
-          <div style={styles.message}>Select a file from the FS tab to view it here.</div>
+          <div className="text-center text-[var(--text-muted)] mt-10 italic">Select a file from the FS tab to view it here.</div>
         ) : fileType === 'sheet' ? (
-          <table style={styles.table}>
+          <table className="w-full border-collapse bg-[var(--bg-panel)] text-[var(--text-primary)]">
             <tbody>
               {content.map((row, rIdx) => (
                 <tr key={rIdx}>
                   {row.map((cell, cIdx) => (
-                    <td key={cIdx} style={rIdx === 0 ? styles.th : styles.td}>{cell}</td>
+                    <td key={cIdx} className={rIdx === 0 ? "border border-[var(--border-color)] p-2 bg-[var(--bg-surface-hover)] font-bold" : "border border-[var(--border-color)] p-2"}>{cell}</td>
                   ))}
                 </tr>
               ))}
@@ -175,97 +175,22 @@ export default function DocumentsPage() {
           </table>
         ) : fileType === 'docx' ? (
           <div 
-            style={styles.richText} 
+            className="bg-[var(--bg-panel)] text-[var(--text-primary)] p-8 rounded min-h-full" 
             dangerouslySetInnerHTML={{ __html: content }} 
           />
         ) : fileType === 'pdf' ? (
           <iframe 
             src={content} 
             title="PDF Viewer"
-            style={{ width: '100%', height: '100%', border: 'none' }} 
+            className="w-full h-full border-none" 
           />
         ) : fileType === 'text' ? (
-          <pre style={styles.preText}>{content}</pre>
+          <pre className="m-0 whitespace-pre-wrap font-mono text-[13px]">{content}</pre>
         ) : (
-          <div style={styles.message}>{content}</div>
+          <div className="text-center text-[var(--text-muted)] mt-10 italic">{content}</div>
         )}
       </div>
     </div>
   );
 }
 
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    backgroundColor: '#1a1a24',
-    color: '#e2e8f0',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '12px 20px',
-    backgroundColor: '#121215',
-    borderBottom: '1px solid #2d3748',
-  },
-  title: {
-    fontSize: '14px',
-    fontWeight: '600',
-  },
-  toolbar: {
-    display: 'flex',
-    gap: '8px',
-  },
-  btn: {
-    backgroundColor: '#4facfe',
-    color: 'white',
-    border: 'none',
-    padding: '6px 12px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontSize: '12px',
-    fontWeight: '600',
-  },
-  viewerContainer: {
-    flex: 1,
-    overflow: 'auto',
-    padding: '20px',
-  },
-  message: {
-    textAlign: 'center',
-    color: '#718096',
-    marginTop: '40px',
-    fontStyle: 'italic',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    backgroundColor: '#fff',
-    color: '#333',
-  },
-  th: {
-    border: '1px solid #cbd5e0',
-    padding: '8px',
-    backgroundColor: '#e2e8f0',
-    fontWeight: 'bold',
-  },
-  td: {
-    border: '1px solid #cbd5e0',
-    padding: '8px',
-  },
-  richText: {
-    backgroundColor: 'white',
-    color: 'black',
-    padding: '2rem',
-    borderRadius: '4px',
-    minHeight: '100%',
-  },
-  preText: {
-    margin: 0,
-    whiteSpace: 'pre-wrap',
-    fontFamily: 'monospace',
-    fontSize: '13px',
-  }
-};

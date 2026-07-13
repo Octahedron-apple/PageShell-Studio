@@ -65,6 +65,99 @@ self.onmessage = async (event) => {
       self.postMessage({ txId, type: 'SUCCESS', data: readBuffer });
     }
     
+    if (action === 'DELETE_ENTRY') {
+      const parts = filePath.split('/');
+      let currentHandle = root;
+
+      for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        if (!part || part === '.') continue;
+        currentHandle = await currentHandle.getDirectoryHandle(part, { create: false });
+      }
+
+      const entryName = parts[parts.length - 1];
+
+      let isMoved = false;
+      try {
+        const fileHandle = await currentHandle.getFileHandle(entryName);
+        const trashDir = await root.getDirectoryHandle('.trash', { create: true });
+        const trashFileName = `${Date.now()}_${entryName}`;
+        
+        if (fileHandle.move) {
+          await fileHandle.move(trashDir, trashFileName);
+          isMoved = true;
+        } else {
+          const destFileHandle = await trashDir.getFileHandle(trashFileName, { create: true });
+          const srcAccessHandle = await fileHandle.createSyncAccessHandle();
+          const fileSize = srcAccessHandle.getSize();
+          const readBuffer = new Uint8Array(fileSize);
+          srcAccessHandle.read(readBuffer, { at: 0 });
+          srcAccessHandle.close();
+
+          const destAccessHandle = await destFileHandle.createSyncAccessHandle();
+          destAccessHandle.truncate(0);
+          destAccessHandle.write(readBuffer, { at: 0 });
+          destAccessHandle.flush();
+          destAccessHandle.close();
+        }
+      } catch (e) {
+        // Fail silently and proceed to hard delete
+      }
+
+      if (!isMoved) {
+        await currentHandle.removeEntry(entryName, { recursive: true });
+      }
+
+      self.postMessage({ txId, type: 'SUCCESS' });
+    }
+    
+    if (action === 'CLEAR_TRASH') {
+      try {
+        await root.removeEntry('.trash', { recursive: true });
+      } catch (e) {}
+      self.postMessage({ txId, type: 'SUCCESS' });
+    }
+    
+    if (action === 'MOVE_ENTRY') {
+      const { sourcePath, targetPath } = event.data;
+      
+      // Read source file
+      const srcFileHandle = await getFileHandleRecursive(root, sourcePath);
+      const srcAccessHandle = await srcFileHandle.createSyncAccessHandle();
+      let readBuffer;
+      try {
+        const fileSize = srcAccessHandle.getSize();
+        readBuffer = new Uint8Array(fileSize);
+        srcAccessHandle.read(readBuffer, { at: 0 });
+      } finally {
+        srcAccessHandle.close();
+      }
+      
+      // Write to target file
+      const destFileHandle = await getFileHandleRecursive(root, targetPath, { create: true });
+      const destAccessHandle = await destFileHandle.createSyncAccessHandle();
+      try {
+        destAccessHandle.truncate(0);
+        destAccessHandle.write(readBuffer, { at: 0 });
+        destAccessHandle.flush();
+      } finally {
+        destAccessHandle.close();
+      }
+      
+      // Delete source entry
+      const parts = sourcePath.split('/');
+      let currentHandle = root;
+      for (let i = 0; i < parts.length - 1; i++) {
+        const part = parts[i];
+        if (!part || part === '.') continue;
+        currentHandle = await currentHandle.getDirectoryHandle(part, { create: false });
+      }
+      const entryName = parts[parts.length - 1];
+      await currentHandle.removeEntry(entryName, { recursive: true });
+
+      self.postMessage({ txId, type: 'SUCCESS' });
+    }
+    
     if (action === 'GET_TREE') {
       // Utility loop to map out the current directory layout tree for the UI
       const fileTree = await generateVisualTreeArray(root);
@@ -116,6 +209,8 @@ async function getFileHandleRecursive(rootHandle, filePath, options = {}) {
 async function generateVisualTreeArray(dirHandle, currentPath = '') {
   const results = [];
   for await (const entry of dirHandle.values()) {
+    if (entry.name === '.trash') continue;
+    
     const entryPath = currentPath ? `${currentPath}/${entry.name}` : entry.name;
     if (entry.kind === 'file') {
       results.push({ name: entry.name, path: entryPath, type: 'file' });

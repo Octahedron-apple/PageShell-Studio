@@ -1,4 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import Modal from './Modal.jsx';
+import { previewZip } from '../utils/zipUtils.js';
 
 const BINARY_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'xlsx', 'xls', 'whl', 'wasm', 'mp4', 'webp'];
 const TEXT_EXTS   = ['html', 'css', 'js', 'py', 'json', 'md', 'txt', 'csv'];
@@ -27,8 +29,9 @@ function canOpenInViewer(name) {
   return VIEWER_EXTS.includes(ext);
 }
 
-function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode }) {
+function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode, activeFile, onDelete }) {
   const [open, setOpen] = useState(true);
+  const [isHovered, setIsHovered] = useState(false);
   const isDir = node.type === 'directory';
 
   const handleClick = () => {
@@ -43,36 +46,66 @@ function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode
   const isSelected = !isDir && selectedFiles?.includes(node.path);
   const isEditable = !isDir && (canOpenInEditor(node.name) || canOpenInViewer(node.name));
 
+  const isActive = !isDir && node.path === activeFile;
+  const isEditorActive = isActive && canOpenInEditor(node.name);
+  const isViewerActive = isActive && canOpenInViewer(node.name);
+
+  let bgStyle = undefined;
+  let borderStyle = '2px solid transparent';
+
+  if (isEditorActive) {
+    bgStyle = 'rgba(16, 185, 129, 0.15)'; // Emerald for editor
+    borderStyle = '2px solid #10b981';
+  } else if (isViewerActive) {
+    bgStyle = 'rgba(245, 158, 11, 0.15)'; // Amber for document viewer
+    borderStyle = '2px solid #f59e0b';
+  } else if (isActive) {
+    bgStyle = 'rgba(236, 72, 153, 0.15)'; // Pink for media
+    borderStyle = '2px solid #ec4899';
+  } else if (isSelected) {
+    bgStyle = 'rgba(79, 172, 254, 0.12)'; // Blue for AI context
+    borderStyle = '2px solid #4facfe';
+  }
+
   return (
     <>
       <div
         style={{
-          ...styles.row,
           paddingLeft: `${indent + 12}px`,
-          cursor: isDir ? 'pointer' : isEditable ? 'pointer' : 'default',
-          backgroundColor: isSelected ? 'rgba(79, 172, 254, 0.12)' : undefined,
-          borderLeft: isSelected ? '2px solid #4facfe' : '2px solid transparent',
+          backgroundColor: bgStyle,
+          borderLeft: borderStyle,
           opacity: !isDir && !isEditable && mode === 'editor' ? 0.45 : 1,
         }}
+        className={`flex items-center gap-1.5 px-3 py-1 text-[13px] transition-colors duration-100 select-none min-h-[30px] box-border ${isDir || isEditable ? 'cursor-pointer' : 'cursor-default'}`}
         onClick={handleClick}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
         title={isDir ? (open ? 'Collapse' : 'Expand') : node.path}
       >
-        <span style={styles.arrow}>
+        <span className="w-2.5 text-[10px] text-[var(--text-muted)] shrink-0 text-center">
           {isDir ? (open ? '▾' : '▸') : ''}
         </span>
-        <span style={styles.icon}>{getIcon(node.name, isDir)}</span>
-        <span style={{ ...styles.name, color: isDir ? '#a0aec0' : isEditable ? '#e2e8f0' : '#718096' }}>
+        <span className="text-sm shrink-0">{getIcon(node.name, isDir)}</span>
+        <span className={`flex-1 truncate ${isDir ? 'text-[#a0aec0]' : isEditable ? 'text-[#e2e8f0]' : 'text-[#718096]'}`}>
           {node.name}
         </span>
         {!isDir && (
-          <span style={styles.badge}>{node.name.split('.').pop().toUpperCase()}</span>
+          <span className="text-[9px] font-extrabold bg-[var(--bg-surface)] text-[var(--text-muted)] px-1.5 py-0.5 rounded shrink-0 border border-[var(--border-color)]">{node.name.split('.').pop().toUpperCase()}</span>
         )}
+        <button
+          style={{ opacity: isHovered ? 1 : 0 }}
+          className="bg-transparent border-none text-[var(--text-muted)] hover:text-red-500 cursor-pointer ml-1 p-0.5 text-xs transition-opacity shrink-0"
+          onClick={(e) => { e.stopPropagation(); onDelete && onDelete(node.path); }}
+          title={`Delete ${node.name}`}
+        >
+          🗑️
+        </button>
         {onToggleSelect && !isDir && (
           <input
             type="checkbox"
             checked={isSelected}
             onChange={e => { e.stopPropagation(); onToggleSelect && onToggleSelect(node.path); }}
-            style={styles.checkbox}
+            className="m-0 cursor-pointer accent-[var(--accent-primary)] shrink-0"
             onClick={e => e.stopPropagation()}
           />
         )}
@@ -86,18 +119,54 @@ function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode
           selectedFiles={selectedFiles}
           onToggleSelect={onToggleSelect}
           mode={mode}
+          activeFile={activeFile}
+          onDelete={onDelete}
         />
       ))}
     </>
   );
 }
 
-export default function FileManager({ files, onUpload, selectedFiles = [], onToggleSelect, onOpenFile, mode = 'editor' }) {
+export default function FileManager({ 
+  files = [], 
+  activeFile = null,
+  onUpload, 
+  onCreateFile,
+  onExportProject,
+  onImportProject,
+  selectedFiles = [], 
+  onToggleSelect, 
+  onOpenFile, 
+  onDeleteFile,
+  onBulkActionClick,
+  mode = 'sidebar' 
+}) {
   const uploadRef = useRef(null);
+  const importZipRef = useRef(null);
+  const newFileInputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isCreatingFile, setIsCreatingFile] = useState(false);
+  const [newFileName, setNewFileName] = useState('');
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importFilesPreview, setImportFilesPreview] = useState([]);
+  const [pendingImportFile, setPendingImportFile] = useState(null);
 
   // files is an array of top-level nodes inside "workspace"
   const nodes = files || [];
+
+  useEffect(() => {
+    if (isCreatingFile && newFileInputRef.current) {
+      newFileInputRef.current.focus();
+    }
+  }, [isCreatingFile]);
+
+  const submitNewFile = () => {
+    if (newFileName.trim()) {
+      onCreateFile(newFileName.trim());
+    }
+    setIsCreatingFile(false);
+    setNewFileName('');
+  };
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -119,10 +188,33 @@ export default function FileManager({ files, onUpload, selectedFiles = [], onTog
     }
   };
 
+  const handleZipSelect = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        const filesList = await previewZip(file);
+        setImportFilesPreview(filesList);
+        setPendingImportFile(file);
+        setImportModalOpen(true);
+      } catch (err) {
+        console.error("Failed to preview zip", err);
+      }
+    }
+    e.target.value = '';
+  };
+
+  const confirmImport = () => {
+    if (pendingImportFile) {
+      onImportProject?.(pendingImportFile);
+    }
+    setImportModalOpen(false);
+    setPendingImportFile(null);
+  };
+
   return (
     <div 
+      className={`flex flex-col h-full bg-[var(--bg-app)] box-border overflow-hidden font-sans`}
       style={{
-        ...styles.container,
         backgroundColor: isDragging ? '#1a1a24' : '#0d0d10',
         border: isDragging ? '2px dashed #4facfe' : '2px solid transparent'
       }}
@@ -131,15 +223,46 @@ export default function FileManager({ files, onUpload, selectedFiles = [], onTog
       onDrop={handleDrop}
     >
       {/* Header */}
-      <div style={styles.header}>
-        <span style={styles.headerTitle}>📁 Files</span>
-        <button
-          style={styles.uploadBtn}
-          onClick={() => uploadRef.current?.click()}
-          title="Upload file to workspace"
-        >
-          ↑ Upload
-        </button>
+      <div className="flex flex-col gap-2 px-4 py-3 bg-[var(--bg-panel)] border-b border-[var(--border-color)] shrink-0">
+        <div className="flex justify-between items-center">
+          <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">📁 Files</span>
+          <div className="flex gap-2">
+            {selectedFiles.length > 0 && onBulkActionClick && (
+              <button className="bg-transparent border border-[var(--border-color)] text-indigo-400 text-[11px] font-bold px-2.5 py-1 rounded cursor-pointer transition-all duration-150 hover:bg-indigo-400/10" onClick={onBulkActionClick} title="Run Bulk AI Action">✨ Bulk AI</button>
+            )}
+            {onExportProject && (
+              <button className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-[11px] font-bold px-2.5 py-1 rounded cursor-pointer transition-all duration-150 hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]" onClick={onExportProject} title="Export project to zip">↓ Export</button>
+            )}
+            {onImportProject && (
+              <button className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-[11px] font-bold px-2.5 py-1 rounded cursor-pointer transition-all duration-150 hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]" onClick={() => importZipRef.current?.click()} title="Import project from zip">↑ Import</button>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button
+            className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-[11px] font-bold px-2.5 py-1 rounded cursor-pointer transition-all duration-150 hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+            onClick={() => uploadRef.current?.click()}
+            title="Upload file to workspace"
+          >
+            ↑ Upload
+          </button>
+          {onCreateFile && (
+            <button
+              className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-[11px] font-bold px-2.5 py-1 rounded cursor-pointer transition-all duration-150 hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+              onClick={() => setIsCreatingFile(true)}
+              title="Create new file"
+            >
+              + New
+            </button>
+          )}
+        </div>
+        <input
+          ref={importZipRef}
+          type="file"
+          accept=".zip"
+          style={{ display: 'none' }}
+          onChange={handleZipSelect}
+        />
         <input
           ref={uploadRef}
           type="file"
@@ -148,10 +271,27 @@ export default function FileManager({ files, onUpload, selectedFiles = [], onTog
         />
       </div>
 
-      {/* Tree */}
-      <div style={styles.tree}>
-        {nodes.length === 0 ? (
-          <div style={styles.empty}>No files yet. Upload or run a script to create files.</div>
+      <div className="flex-1 overflow-y-auto py-1.5">
+        {isCreatingFile && (
+          <div className="flex items-center gap-1.5 px-3 py-1 text-[13px] min-h-[30px] box-border" style={{ paddingLeft: '28px' }}>
+            <span className="text-sm shrink-0">📄</span>
+            <input
+              ref={newFileInputRef}
+              type="text"
+              value={newFileName}
+              onChange={e => setNewFileName(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') submitNewFile();
+                if (e.key === 'Escape') { setIsCreatingFile(false); setNewFileName(''); }
+              }}
+              onBlur={submitNewFile}
+              className="flex-1 bg-transparent border-b border-[var(--accent-primary)] text-[var(--text-primary)] text-[13px] outline-none m-0 p-0"
+              placeholder="filename.ext"
+            />
+          </div>
+        )}
+        {nodes.length === 0 && !isCreatingFile ? (
+          <div className="px-4 py-6 text-xs text-[var(--text-muted)] text-center leading-relaxed italic">No files yet. Upload or run a script to create files.</div>
         ) : (
           nodes.map(node => (
             <FileNode
@@ -162,121 +302,53 @@ export default function FileManager({ files, onUpload, selectedFiles = [], onTog
               selectedFiles={selectedFiles}
               onToggleSelect={onToggleSelect}
               mode={mode}
+              activeFile={activeFile}
+              onDelete={onDeleteFile}
             />
           ))
         )}
       </div>
 
       {onToggleSelect && (
-        <div style={styles.contextHint}>
+        <div className="px-3.5 py-2 text-[11px] text-[var(--text-muted)] border-t border-[var(--border-color)] italic shrink-0">
           ☑ Check files to include as AI context
         </div>
       )}
+
+      {/* Zip Import Confirmation Modal */}
+      <Modal 
+        isOpen={importModalOpen} 
+        title="Confirm Workspace Import"
+        onClose={() => setImportModalOpen(false)}
+        actions={
+          <>
+            <button 
+              onClick={() => setImportModalOpen(false)}
+              className="px-4 py-2 rounded-lg bg-[var(--bg-surface-hover)] text-[var(--text-primary)] font-medium hover:bg-[var(--bg-panel)] transition-colors border border-[var(--border-color)]"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={confirmImport}
+              className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-white font-bold hover:opacity-90 transition-opacity border-none"
+            >
+              Confirm Import
+            </button>
+          </>
+        }
+      >
+        <p className="mb-4 font-medium text-[var(--text-primary)]">
+          Importing this project will merge or overwrite files in your current workspace. The following files will be imported:
+        </p>
+        <div className="bg-[var(--bg-app)] rounded-lg border border-[var(--border-color)] max-h-48 overflow-y-auto p-3 font-mono text-xs">
+          {importFilesPreview.map((path, idx) => (
+            <div key={idx} className="mb-1 text-[var(--text-muted)] truncate">{path}</div>
+          ))}
+          {importFilesPreview.length === 0 && (
+            <div className="text-center italic text-zinc-500 py-2">No files found in zip.</div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
-
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    backgroundColor: '#0d0d10',
-    boxSizing: 'border-box',
-    overflow: 'hidden',
-    fontFamily: "'Inter', 'Segoe UI', sans-serif",
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    padding: '10px 14px',
-    borderBottom: '1px solid #1a1a22',
-    backgroundColor: '#121215',
-    gap: '8px',
-    flexShrink: 0,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: '12px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    color: '#718096',
-  },
-  uploadBtn: {
-    backgroundColor: 'transparent',
-    border: '1px solid #2d3748',
-    color: '#a0aec0',
-    fontSize: '11px',
-    fontWeight: '700',
-    padding: '3px 10px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    transition: 'all 0.15s',
-  },
-  tree: {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '6px 0',
-  },
-  row: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '5px 12px',
-    fontSize: '13px',
-    transition: 'background 0.1s',
-    userSelect: 'none',
-    minHeight: '30px',
-    boxSizing: 'border-box',
-  },
-  arrow: {
-    width: '10px',
-    fontSize: '10px',
-    color: '#4a5568',
-    flexShrink: 0,
-    textAlign: 'center',
-  },
-  icon: {
-    fontSize: '14px',
-    flexShrink: 0,
-  },
-  name: {
-    flex: 1,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  badge: {
-    fontSize: '9px',
-    fontWeight: '800',
-    backgroundColor: '#1a1a2a',
-    color: '#4a5568',
-    padding: '2px 5px',
-    borderRadius: '3px',
-    flexShrink: 0,
-    border: '1px solid #2d3748',
-  },
-  checkbox: {
-    margin: 0,
-    cursor: 'pointer',
-    accentColor: '#4facfe',
-    flexShrink: 0,
-  },
-  empty: {
-    padding: '24px 16px',
-    fontSize: '12px',
-    color: '#4a5568',
-    textAlign: 'center',
-    lineHeight: '1.6',
-    fontStyle: 'italic',
-  },
-  contextHint: {
-    padding: '8px 14px',
-    fontSize: '11px',
-    color: '#4a5568',
-    borderTop: '1px solid #1a1a22',
-    fontStyle: 'italic',
-    flexShrink: 0,
-  },
-};

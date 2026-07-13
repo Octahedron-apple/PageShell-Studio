@@ -20,7 +20,7 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
   useEffect(() => { onChangeRef.current = onChange; }, [onChange]);
   useEffect(() => { onSaveRef.current = onSave; }, [onSave]);
 
-  const { handleAutocomplete } = useApp();
+  const { handleAutocomplete, theme } = useApp();
   const handleAutocompleteRef = useRef(handleAutocomplete);
   useEffect(() => { handleAutocompleteRef.current = handleAutocomplete; }, [handleAutocomplete]);
 
@@ -47,9 +47,17 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
         return null;
       }
     };
+    const debounceTimerRef = { current: null };
+    const lastEmittedCodeRef = { current: code };
+
     const updateListener = EditorView.updateListener.of((update) => {
       if (update.docChanged && update.transactions.some(tr => tr.isUserEvent('input') || tr.isUserEvent('delete') || tr.isUserEvent('undo') || tr.isUserEvent('redo') || tr.isUserEvent('paste') || tr.isUserEvent('cut'))) {
-        if (onChangeRef.current) onChangeRef.current(update.state.doc.toString());
+        const currentDoc = update.state.doc.toString();
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = setTimeout(() => {
+          lastEmittedCodeRef.current = currentDoc;
+          if (onChangeRef.current) onChangeRef.current(currentDoc);
+        }, 300);
       }
     });
 
@@ -71,7 +79,7 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
       extensions: [
         basicSetup,
         langExt,
-        oneDark,
+        theme === 'dark' ? oneDark : [],
         updateListener,
         saveKeymap,
         drawSelection(),
@@ -82,9 +90,10 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
         EditorView.lineWrapping,
         // Make the editor take full height of its wrapper
         EditorView.theme({
-          "&": { height: "100%", width: "100%", backgroundColor: "#1a1a1e" },
+          "&": { height: "100%", width: "100%", backgroundColor: "transparent" },
           ".cm-scroller": { fontFamily: "'Fira Code', 'Courier New', Courier, monospace" },
-          ".cm-activeLine": { backgroundColor: "rgba(255, 255, 255, 0.04)" }
+          ".cm-activeLine": { backgroundColor: theme === 'dark' ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.04)" },
+          ".cm-content": { caretColor: "var(--text-primary)" }
         })
       ]
     });
@@ -103,14 +112,16 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
         viewRef.current = null;
       }
     };
-  // Re-initialize editor when activeFile changes to swap language extensions
+  // Re-initialize editor when activeFile or theme changes
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeFile]);
+  }, [activeFile, theme]);
 
-  // Sync external state changes into the editor (e.g. from file loading)
+  // Sync external state changes into the editor (e.g. from file loading or AI edits)
   useEffect(() => {
     const view = viewRef.current;
-    if (view) {
+    // Only overwrite the editor content if it doesn't have focus.
+    // This prevents debounced state cycles from resetting the user's cursor while typing.
+    if (view && !view.hasFocus) {
       const currentDoc = view.state.doc.toString();
       if (code !== currentDoc) {
         view.dispatch({
@@ -120,80 +131,20 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
     }
   }, [code]);
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <div style={styles.titleArea}>
-          <span style={styles.editorIcon}>📝</span>
-          <span style={styles.title}>{activeFile ? activeFile.split('/').pop() : 'Editor'}</span>
+    <div className="flex flex-col h-full bg-[var(--bg-app)] overflow-hidden">
+      <div className="flex justify-between items-center px-5 py-3 bg-[var(--bg-panel)] border-b border-[var(--border-color)]">
+        <div className="flex items-center gap-2">
+          <span className="text-base">📝</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">{activeFile ? activeFile.split('/').pop() : 'Editor'}</span>
         </div>
 
       </div>
       <div 
         ref={editorContainerRef}
-        style={styles.editorWrapper}
+        className="flex-1 overflow-hidden bg-[var(--bg-surface)] flex flex-col"
         id="editor-container"
       />
     </div>
   );
 }
 
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    backgroundColor: '#18181b',
-    overflow: 'hidden'
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '12px 20px',
-    backgroundColor: '#121215',
-    borderBottom: '1px solid #222228'
-  },
-  titleArea: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
-  },
-  editorIcon: {
-    fontSize: '16px'
-  },
-  title: {
-    fontSize: '14px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    color: '#a0aec0'
-  },
-  runButton: {
-    backgroundColor: '#4facfe',
-    backgroundImage: 'linear-gradient(90deg, #4facfe 0%, #00f2fe 100%)',
-    color: '#fff',
-    border: 'none',
-    padding: '8px 18px',
-    borderRadius: '6px',
-    fontWeight: '700',
-    fontSize: '13px',
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(79, 172, 254, 0.2)',
-    transition: 'all 0.3s ease',
-    outline: 'none',
-  },
-  runButtonLoading: {
-    backgroundImage: 'none',
-    backgroundColor: '#f59e0b',
-    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
-    cursor: 'not-allowed',
-    animation: 'pulse 1.5s infinite',
-  },
-  editorWrapper: {
-    flex: 1,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1e',
-    display: 'flex',
-    flexDirection: 'column'
-  }
-};

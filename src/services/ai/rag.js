@@ -9,7 +9,6 @@
  */
 
 import mammoth from 'mammoth';
-import MiniSearch from 'minisearch';
 
 // ─── Text Extraction ──────────────────────────────────────────────────────────
 
@@ -33,8 +32,8 @@ export async function extractPdfText(bytes) {
   // Dynamically import to respect the vite optimizeDeps.exclude rule.
   const pdfjsLib = await import('pdfjs-dist');
 
-  // Point to the CDN worker to avoid WASM-relative-path issues (pdfjs-dist is excluded from pre-bundling).
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+  // Point to the local vendor worker to ensure 100% offline support.
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}vendor/pdfjs/pdf.worker.min.mjs`;
 
   const loadingTask = pdfjsLib.getDocument({ data: bytes });
   const pdf = await loadingTask.promise;
@@ -106,39 +105,83 @@ export function chunkText(text, sourceFile) {
   return chunks;
 }
 
-// ─── Indexing ─────────────────────────────────────────────────────────────────
+// ─── Semantic Search & Worker Orchestration ────────────────────────────────────
 
-/**
- * Builds a MiniSearch index from an array of chunks.
- * @param {Array<{id: number, text: string, source: string}>} chunks
- * @returns {MiniSearch} Searchable index
- */
-export function buildIndex(chunks) {
-  const index = new MiniSearch({
-    fields: ['text'],
-    storeFields: ['text', 'source'],
-    searchOptions: {
-      boost: { text: 2 },
-      fuzzy: 0.2,
-      prefix: true,
-    },
-  });
-  index.addAll(chunks);
-  return index;
+let embeddingWorker = null;
+let currentResolve = null;
+let currentReject = null;
+let currentOnProgress = null;
+
+function getEmbeddingWorker() {
+  if (!embeddingWorker) {
+    embeddingWorker = new Worker(new URL('./embeddings.worker.js', import.meta.url), { type: 'module' });
+    embeddingWorker.addEventListener('message', (event) => {
+      const { type, embeddings, progress, error } = event.data;
+      if (type === 'COMPLETE' && currentResolve) {
+        currentResolve(embeddings);
+        currentResolve = null;
+        currentReject = null;
+        currentOnProgress = null;
+      } else if (type === 'PROGRESS' && currentOnProgress) {
+        currentOnProgress(progress);
+      } else if (type === 'ERROR' && currentReject) {
+        currentReject(new Error(error));
+        currentResolve = null;
+        currentReject = null;
+        currentOnProgress = null;
+      }
+    });
+  }
+  return embeddingWorker;
 }
 
-// ─── Retrieval ────────────────────────────────────────────────────────────────
+export function generateEmbeddings(texts, onProgress) {
+  return new Promise((resolve, reject) => {
+    if (currentResolve) {
+      reject(new Error("Worker is busy processing another embedding request."));
+      return;
+    }
+    currentResolve = resolve;
+    currentReject = reject;
+    currentOnProgress = onProgress;
+    const worker = getEmbeddingWorker();
+    worker.postMessage({ type: 'EMBED', id: Date.now(), chunks: texts });
+  });
+}
+
+export function cosineSimilarity(vecA, vecB) {
+  let dotProduct = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+  }
+  // No need to divide by norms because the worker returns normalized vectors
+  return dotProduct;
+}
 
 /**
- * Searches the index for chunks relevant to the query.
- * @param {MiniSearch} index
- * @param {string} query
+ * Searches the semantic chunks for the most relevant results.
+ * @param {Array} allChunks - Array of all document chunks with vectors
+ * @param {string} query - The search query
  * @param {number} topK - Number of results to return
- * @returns {Array<{text: string, source: string}>}
+ * @returns {Promise<Array<{text: string, source: string}>>}
  */
-export function retrieveChunks(index, query, topK = 5) {
-  const results = index.search(query, { combineWith: 'OR' });
-  return results.slice(0, topK).map(r => ({ text: r.text, source: r.source }));
+export async function retrieveChunks(allChunks, query, topK = 5) {
+  if (allChunks.length === 0) return [];
+  
+  // Embed the query
+  const [queryVector] = await generateEmbeddings([query]);
+  
+  // Calculate similarity scores for all chunks
+  const scoredChunks = allChunks.map(chunk => ({
+    ...chunk,
+    score: cosineSimilarity(queryVector, chunk.vector)
+  }));
+  
+  // Sort descending by score
+  scoredChunks.sort((a, b) => b.score - a.score);
+  
+  // Return top K
+  return scoredChunks.slice(0, topK).map(r => ({ text: r.text, source: r.source }));
 }
 
 // ─── Full Pipeline ────────────────────────────────────────────────────────────
@@ -149,9 +192,10 @@ export function retrieveChunks(index, query, topK = 5) {
  *
  * @param {Uint8Array} bytes - Raw file bytes
  * @param {string} filename - Used to determine file type and as metadata
- * @returns {Promise<{index: MiniSearch, chunkCount: number} | null>}
+ * @param {Function} onProgress - Callback for model download progress
+ * @returns {Promise<{chunks: Array, chunkCount: number} | null>}
  */
-export async function indexDocument(bytes, filename) {
+export async function indexDocument(bytes, filename, onProgress) {
   const ext = filename.toLowerCase().split('.').pop();
 
   let rawText = '';
@@ -168,6 +212,14 @@ export async function indexDocument(bytes, filename) {
   }
 
   const chunks = chunkText(rawText, filename);
-  const index = buildIndex(chunks);
-  return { index, chunkCount: chunks.length };
+  
+  const textArray = chunks.map(c => c.text);
+  const vectors = await generateEmbeddings(textArray, onProgress);
+  
+  const chunkData = chunks.map((chunk, i) => ({
+    ...chunk,
+    vector: vectors[i]
+  }));
+  
+  return { chunks: chunkData, chunkCount: chunks.length };
 }

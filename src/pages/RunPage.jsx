@@ -25,15 +25,15 @@ export default function RunPage() {
   }, [scripts, runTarget, setRunTarget]);
 
   return (
-    <div style={styles.container}>
-      <div style={styles.header}>
-        <div style={styles.titleArea}>
-          <span style={styles.icon}>▶️</span>
-          <span style={styles.title}>Execution Runner</span>
+    <div className="flex flex-col h-full w-full bg-[var(--bg-status)] overflow-hidden">
+      <div className="flex justify-between items-center px-5 py-3 bg-[var(--bg-panel)] border-b border-[var(--border-color)] shrink-0">
+        <div className="flex items-center gap-2">
+          <span className="text-base">▶️</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">Execution Runner</span>
         </div>
-        <div style={styles.actionArea}>
+        <div className="flex items-center gap-3">
           <select 
-            style={styles.select} 
+            className="bg-[var(--bg-surface)] text-[var(--text-primary)] border border-[var(--border-color)] rounded px-2.5 py-1.5 text-[13px] outline-none cursor-pointer" 
             value={runTarget || ''} 
             onChange={(e) => setRunTarget(e.target.value)}
             disabled={loading}
@@ -46,95 +46,21 @@ export default function RunPage() {
           <button
             onClick={handleRun}
             disabled={loading || !runTarget}
-            style={{
-              ...styles.runButton,
-              ...(loading ? styles.runButtonLoading : {})
-            }}
+            className={`text-[var(--accent-text)] border-none px-[18px] py-2 rounded-md font-bold text-[13px] transition-all duration-300 outline-none ${
+              loading 
+                ? 'bg-none bg-[var(--color-warning)] shadow-[0_4px_12px_rgba(245,158,11,0.3)] cursor-not-allowed animate-pulse'
+                : 'bg-[var(--accent-primary)] bg-[var(--accent-gradient)] shadow-[0_4px_12px_rgba(79,172,254,0.2)] cursor-pointer'
+            }`}
             id="run-page-btn"
           >
             {loading ? 'Running...' : 'Run (F5)'}
           </button>
         </div>
       </div>
-      <div style={styles.terminalWrapper}>
+      <div className="flex-1 overflow-hidden relative">
         <Terminal logs={logs} onClear={() => setLogs([])} />
       </div>
     </div>
   );
 }
 
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100%',
-    width: '100%',
-    backgroundColor: '#0c0c0e',
-    overflow: 'hidden',
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '12px 20px',
-    backgroundColor: '#121215',
-    borderBottom: '1px solid #222228',
-    flexShrink: 0,
-  },
-  titleArea: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  icon: {
-    fontSize: '16px',
-  },
-  title: {
-    fontSize: '14px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    color: '#a0aec0',
-  },
-  actionArea: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  select: {
-    backgroundColor: '#1a1a20',
-    color: '#e2e8f0',
-    border: '1px solid #2d3748',
-    borderRadius: '4px',
-    padding: '6px 10px',
-    fontSize: '13px',
-    outline: 'none',
-    cursor: 'pointer',
-  },
-  runButton: {
-    backgroundColor: '#4facfe',
-    backgroundImage: 'linear-gradient(90deg, #4facfe 0%, #00f2fe 100%)',
-    color: '#fff',
-    border: 'none',
-    padding: '8px 18px',
-    borderRadius: '6px',
-    fontWeight: '700',
-    fontSize: '13px',
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(79, 172, 254, 0.2)',
-    transition: 'all 0.3s ease',
-    outline: 'none',
-  },
-  runButtonLoading: {
-    backgroundImage: 'none',
-    backgroundColor: '#f59e0b',
-    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.3)',
-    cursor: 'not-allowed',
-    animation: 'pulse 1.5s infinite',
-  },
-  terminalWrapper: {
-    flex: 1,
-    overflow: 'hidden',
-    position: 'relative',
-  }
-};
