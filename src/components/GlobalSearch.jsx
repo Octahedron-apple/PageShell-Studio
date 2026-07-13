@@ -32,12 +32,8 @@ export default function GlobalSearch({ isOpen, onClose, onSelect }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed top-0 left-0 w-screen h-screen bg-[rgba(0,0,0,0.5)] flex items-start justify-center pt-[10vh] z-[9999]" onClick={onClose}>
-      <div className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-lg w-[600px] max-w-[90vw] max-h-[80vh] flex flex-col shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden" onClick={e => e.stopPropagation()}>
-        <div className="flex justify-between items-center px-4 py-3 border-b border-[var(--border-color)] bg-[var(--bg-app)]">
-          <span className="text-sm font-bold text-[var(--text-primary)]">🔍 Global Search</span>
-          <button className="bg-transparent border-none text-[var(--text-muted)] cursor-pointer text-base" onClick={onClose}>✕</button>
-        </div>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-start justify-center pt-[15vh] z-[9999]" onClick={onClose}>
+      <div className="bg-[var(--bg-panel)] rounded-sm w-[640px] max-w-[90vw] max-h-[80vh] flex flex-col shadow-2xl overflow-hidden border border-zinc-800" onClick={e => e.stopPropagation()}>
         
         <input
           ref={inputRef}
@@ -45,27 +41,27 @@ export default function GlobalSearch({ isOpen, onClose, onSelect }) {
           value={query}
           onChange={e => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Search for text across all files..."
-          className="m-3 px-3.5 py-2.5 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded text-[var(--text-primary)] text-sm outline-none"
+          placeholder="Search files..."
+          className="w-full px-6 py-5 bg-transparent text-[var(--text-primary)] text-2xl outline-none placeholder:text-zinc-600 border-b border-zinc-800 focus:ring-0"
         />
 
-        <div className="flex-1 overflow-y-auto px-3 pb-3 flex flex-col gap-1">
+        <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-1">
           {query.length > 0 && results.length === 0 && (
-            <div className="p-4 text-center text-[var(--text-muted)] text-[13px]">No results found for "{query}"</div>
+            <div className="p-6 text-center text-[var(--text-muted)] text-sm">No results found for "{query}"</div>
           )}
-          {results.map((result) => (
+          {results.map((result, idx) => (
             <div 
               key={result.id} 
-              className="px-3 py-2 rounded cursor-pointer hover:bg-[var(--bg-surface-hover)]"
+              className={`px-4 py-3 rounded-sm cursor-pointer transition-opacity text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 flex items-center justify-between ${idx === 0 ? 'bg-zinc-800/30 text-zinc-200' : ''}`}
               onClick={() => {
                 onSelect(result.path);
                 onClose();
               }}
             >
-              <div className="text-[13px] font-semibold text-[var(--text-primary)] mb-1">{result.path}</div>
+              <div className="text-sm font-medium">{result.path}</div>
               {result.match && (
-                <div className="text-[11px] text-[var(--text-muted)] whitespace-nowrap overflow-hidden text-ellipsis">
-                  Matches: {Object.keys(result.match).join(', ')}
+                <div className="text-xs text-zinc-500 max-w-[50%] truncate">
+                  {Object.keys(result.match).join(', ')}
                 </div>
               )}
             </div>

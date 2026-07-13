@@ -7,18 +7,8 @@ const TEXT_EXTS   = ['html', 'css', 'js', 'py', 'json', 'md', 'txt', 'csv'];
 const VIEWER_EXTS = ['pdf', 'docx', 'xlsx', 'xls'];
 
 function getIcon(name, isDir) {
-  if (isDir) return '📁';
-  const ext = name.split('.').pop().toLowerCase();
-  if (ext === 'html') return '🌐';
-  if (ext === 'css')  return '🎨';
-  if (ext === 'js')   return '⚡';
-  if (ext === 'py')   return '🐍';
-  if (ext === 'json') return '📋';
-  if (ext === 'md')   return '📝';
-  if (ext === 'xlsx' || ext === 'xls') return '📊';
-  return '📄';
+  return null; // Removed as per focus-first typography-led design
 }
-
 function canOpenInEditor(name) {
   const ext = name.split('.').pop().toLowerCase();
   return TEXT_EXTS.includes(ext);
@@ -54,17 +44,17 @@ function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode
   let borderStyle = '2px solid transparent';
 
   if (isEditorActive) {
-    bgStyle = 'rgba(16, 185, 129, 0.15)'; // Emerald for editor
-    borderStyle = '2px solid #10b981';
+    bgStyle = 'rgba(0, 255, 65, 0.1)';
+    borderStyle = '1px solid var(--accent-primary)';
   } else if (isViewerActive) {
-    bgStyle = 'rgba(245, 158, 11, 0.15)'; // Amber for document viewer
-    borderStyle = '2px solid #f59e0b';
+    bgStyle = 'rgba(0, 255, 65, 0.05)';
+    borderStyle = '1px solid var(--accent-primary)';
   } else if (isActive) {
-    bgStyle = 'rgba(236, 72, 153, 0.15)'; // Pink for media
-    borderStyle = '2px solid #ec4899';
+    bgStyle = 'rgba(0, 255, 65, 0.05)';
+    borderStyle = '1px solid var(--accent-primary)';
   } else if (isSelected) {
-    bgStyle = 'rgba(79, 172, 254, 0.12)'; // Blue for AI context
-    borderStyle = '2px solid #4facfe';
+    bgStyle = 'rgba(255, 255, 255, 0.05)';
+    borderStyle = '1px solid var(--border-color)';
   }
 
   return (
@@ -76,36 +66,36 @@ function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode
           borderLeft: borderStyle,
           opacity: !isDir && !isEditable && mode === 'editor' ? 0.45 : 1,
         }}
-        className={`flex items-center gap-1.5 px-3 py-1 text-[13px] transition-colors duration-100 select-none min-h-[30px] box-border ${isDir || isEditable ? 'cursor-pointer' : 'cursor-default'}`}
+        className={`flex items-center gap-2 px-3 py-1.5 text-sm transition-opacity duration-150 select-none min-h-[30px] box-border border-b border-[var(--border-color)] hover:bg-zinc-800/30 group ${isDir || isEditable ? 'cursor-pointer' : 'cursor-default'}`}
         onClick={handleClick}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         title={isDir ? (open ? 'Collapse' : 'Expand') : node.path}
       >
-        <span className="w-2.5 text-[10px] text-[var(--text-muted)] shrink-0 text-center">
-          {isDir ? (open ? '▾' : '▸') : ''}
+        <span className="w-4 text-xs font-mono text-[var(--text-muted)] shrink-0 text-center">
+          {isDir ? (open ? '-' : '+') : ''}
         </span>
-        <span className="text-sm shrink-0">{getIcon(node.name, isDir)}</span>
-        <span className={`flex-1 truncate ${isDir ? 'text-[#a0aec0]' : isEditable ? 'text-[#e2e8f0]' : 'text-[#718096]'}`}>
+        <span className={`flex-1 truncate font-mono tracking-tight transition-colors ${isDir ? 'text-zinc-300 font-semibold' : (isActive || isSelected) ? 'text-white' : 'text-zinc-500 group-hover:text-zinc-300'}`}>
           {node.name}
         </span>
         {!isDir && (
-          <span className="text-[9px] font-extrabold bg-[var(--bg-surface)] text-[var(--text-muted)] px-1.5 py-0.5 rounded shrink-0 border border-[var(--border-color)]">{node.name.split('.').pop().toUpperCase()}</span>
+          <span className={`text-[9px] font-mono tracking-widest uppercase px-1.5 py-0.5 shrink-0 ${isActive ? 'text-[var(--accent-primary)]' : 'text-[var(--text-muted)]'}`}>
+            {node.name.split('.').pop()}
+          </span>
         )}
         <button
-          style={{ opacity: isHovered ? 1 : 0 }}
-          className="bg-transparent border-none text-[var(--text-muted)] hover:text-red-500 cursor-pointer ml-1 p-0.5 text-xs transition-opacity shrink-0"
+          className="opacity-0 group-hover:opacity-100 bg-transparent border-none text-[var(--text-muted)] hover:text-red-400 cursor-pointer ml-2 p-0.5 text-xs transition-opacity shrink-0"
           onClick={(e) => { e.stopPropagation(); onDelete && onDelete(node.path); }}
           title={`Delete ${node.name}`}
         >
-          🗑️
+          ✕
         </button>
         {onToggleSelect && !isDir && (
           <input
             type="checkbox"
             checked={isSelected}
             onChange={e => { e.stopPropagation(); onToggleSelect && onToggleSelect(node.path); }}
-            className="m-0 cursor-pointer accent-[var(--accent-primary)] shrink-0"
+            className="m-0 ml-2 cursor-pointer appearance-none w-3 h-3 border border-[var(--border-color)] checked:bg-[var(--accent-primary)] checked:border-[var(--accent-primary)] shrink-0 transition-colors"
             onClick={e => e.stopPropagation()}
           />
         )}
@@ -225,34 +215,34 @@ export default function FileManager({
       {/* Header */}
       <div className="flex flex-col gap-2 px-4 py-3 bg-[var(--bg-panel)] border-b border-[var(--border-color)] shrink-0">
         <div className="flex justify-between items-center">
-          <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-secondary)]">📁 Files</span>
+          <span className="text-xs font-mono tracking-widest text-[var(--text-secondary)] uppercase">Files</span>
           <div className="flex gap-2">
             {selectedFiles.length > 0 && onBulkActionClick && (
-              <button className="bg-transparent border border-[var(--border-color)] text-indigo-400 text-[11px] font-bold px-2.5 py-1 rounded cursor-pointer transition-all duration-150 hover:bg-indigo-400/10" onClick={onBulkActionClick} title="Run Bulk AI Action">✨ Bulk AI</button>
+              <button className="bg-transparent border border-[var(--border-color)] text-[var(--accent-primary)] text-xs font-mono px-2 py-1 cursor-pointer transition-opacity hover:opacity-70" onClick={onBulkActionClick} title="Run Bulk AI Action">Bulk AI</button>
             )}
             {onExportProject && (
-              <button className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-[11px] font-bold px-2.5 py-1 rounded cursor-pointer transition-all duration-150 hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]" onClick={onExportProject} title="Export project to zip">↓ Export</button>
+              <button className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-xs font-mono px-2 py-1 cursor-pointer transition-opacity hover:opacity-70 hover:text-[var(--text-primary)]" onClick={onExportProject} title="Export project to zip">Export</button>
             )}
             {onImportProject && (
-              <button className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-[11px] font-bold px-2.5 py-1 rounded cursor-pointer transition-all duration-150 hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]" onClick={() => importZipRef.current?.click()} title="Import project from zip">↑ Import</button>
+              <button className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-xs font-mono px-2 py-1 cursor-pointer transition-opacity hover:opacity-70 hover:text-[var(--text-primary)]" onClick={() => importZipRef.current?.click()} title="Import project from zip">Import</button>
             )}
           </div>
         </div>
         <div className="flex gap-2">
           <button
-            className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-[11px] font-bold px-2.5 py-1 rounded cursor-pointer transition-all duration-150 hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+            className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-xs font-mono px-2 py-1 cursor-pointer transition-opacity hover:opacity-70 hover:text-[var(--text-primary)]"
             onClick={() => uploadRef.current?.click()}
             title="Upload file to workspace"
           >
-            ↑ Upload
+            Upload
           </button>
           {onCreateFile && (
             <button
-              className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-[11px] font-bold px-2.5 py-1 rounded cursor-pointer transition-all duration-150 hover:bg-[var(--bg-surface)] hover:text-[var(--text-primary)]"
+              className="bg-transparent border border-[var(--border-color)] text-[var(--text-secondary)] text-xs font-mono px-2 py-1 cursor-pointer transition-opacity hover:opacity-70 hover:text-[var(--text-primary)]"
               onClick={() => setIsCreatingFile(true)}
               title="Create new file"
             >
-              + New
+              New
             </button>
           )}
         </div>
@@ -273,8 +263,8 @@ export default function FileManager({
 
       <div className="flex-1 overflow-y-auto py-1.5">
         {isCreatingFile && (
-          <div className="flex items-center gap-1.5 px-3 py-1 text-[13px] min-h-[30px] box-border" style={{ paddingLeft: '28px' }}>
-            <span className="text-sm shrink-0">📄</span>
+          <div className="flex items-center gap-2 px-3 py-1.5 min-h-[30px] box-border border-b border-[var(--border-color)]" style={{ paddingLeft: '28px' }}>
+            <span className="w-4 text-xs font-mono text-[var(--accent-primary)] shrink-0 text-center">></span>
             <input
               ref={newFileInputRef}
               type="text"
@@ -285,7 +275,7 @@ export default function FileManager({
                 if (e.key === 'Escape') { setIsCreatingFile(false); setNewFileName(''); }
               }}
               onBlur={submitNewFile}
-              className="flex-1 bg-transparent border-b border-[var(--accent-primary)] text-[var(--text-primary)] text-[13px] outline-none m-0 p-0"
+              className="flex-1 bg-transparent border-none text-[var(--text-primary)] font-mono text-sm outline-none m-0 p-0"
               placeholder="filename.ext"
             />
           </div>

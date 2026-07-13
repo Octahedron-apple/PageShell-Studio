@@ -91,9 +91,12 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
         // Make the editor take full height of its wrapper
         EditorView.theme({
           "&": { height: "100%", width: "100%", backgroundColor: "transparent" },
-          ".cm-scroller": { fontFamily: "'Fira Code', 'Courier New', Courier, monospace" },
+          ".cm-scroller": { fontFamily: "var(--font-mono)" },
           ".cm-activeLine": { backgroundColor: theme === 'dark' ? "rgba(255, 255, 255, 0.04)" : "rgba(0, 0, 0, 0.04)" },
-          ".cm-content": { caretColor: "var(--text-primary)" }
+          ".cm-content": { caretColor: "var(--accent-primary)" },
+          ".cm-cursor": { borderLeftColor: "var(--accent-primary)" },
+          "&.cm-focused .cm-cursor": { borderLeftColor: "var(--accent-primary)" },
+          "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: "rgba(0, 255, 65, 0.2)" }
         })
       ]
     });
@@ -132,12 +135,10 @@ export default function Editor({ code, activeFile, onChange, onRun, onSave, load
   }, [code]);
   return (
     <div className="flex flex-col h-full bg-[var(--bg-app)] overflow-hidden">
-      <div className="flex justify-between items-center px-5 py-3 bg-[var(--bg-panel)] border-b border-[var(--border-color)]">
-        <div className="flex items-center gap-2">
-          <span className="text-base">📝</span>
-          <span className="text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">{activeFile ? activeFile.split('/').pop() : 'Editor'}</span>
-        </div>
-
+      <div className="flex justify-between items-center px-4 py-2 bg-[var(--bg-app)] border-b border-[var(--border-color)]">
+        <span className="text-xs font-mono tracking-widest text-[var(--text-muted)] uppercase">
+          {activeFile ? activeFile.split('/').pop() : 'UNTITLED'}
+        </span>
       </div>
       <div 
         ref={editorContainerRef}
