@@ -2,14 +2,13 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext.jsx';
 import FileManager from '../components/FileManager.jsx';
 import SmartSorterPage from './SmartSorterPage.jsx';
-import HomePage from './HomePage.jsx';
 import { fileSystemAPI } from '../services/fs/fileSystem.js';
 import { generateBulk } from '../services/ai/models.js';
 import { extractDocxText, extractPdfText } from '../services/ai/rag.js';
 
 export default function FSPage() {
   const { files, handleUpload, handleCreateFile, selectedFiles, handleToggleFileSelect, handleOpenFile, activeFile, handleExportZip, handleDeleteFile, refreshFiles } = useApp();
-  const [viewMode, setViewMode] = useState('home'); // 'home' | 'fs' | 'sort'
+  const [viewMode, setViewMode] = useState('fs'); // 'fs' | 'sort'
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [bulkInstruction, setBulkInstruction] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -71,7 +70,7 @@ Text Part ${j+1}/${chunks.length}:
 ${chunks[j]}`;
            
            const result = await generateBulk(prompt);
-           processedText += result + '\\n';
+           processedText += result + '\n';
         }
 
         // Save
@@ -97,12 +96,6 @@ ${chunks[j]}`;
     <div className="w-full h-full bg-[var(--bg-app)] overflow-hidden flex flex-col">
       <div className="flex border-b border-zinc-800 bg-zinc-900 shrink-0">
         <button 
-          onClick={() => setViewMode('home')} 
-          className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${viewMode === 'home' ? 'border-emerald-500 text-emerald-400 bg-zinc-800' : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'}`}
-        >
-          Welcome
-        </button>
-        <button 
           onClick={() => setViewMode('fs')} 
           className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${viewMode === 'fs' ? 'border-emerald-500 text-emerald-400 bg-zinc-800' : 'border-transparent text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50'}`}
         >
@@ -117,9 +110,7 @@ ${chunks[j]}`;
       </div>
 
       <div className="flex-1 overflow-hidden relative">
-        {viewMode === 'home' ? (
-          <HomePage />
-        ) : viewMode === 'fs' ? (
+        {viewMode === 'fs' ? (
           <FileManager
             files={files}
             activeFile={activeFile}

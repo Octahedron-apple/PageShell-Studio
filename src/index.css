@@ -13,14 +13,14 @@
 
 :root {
   /* LIGHT THEME VARIABLES (Muted/Monochrome) */
-  --bg-app: #fafafa;
-  --bg-panel: #ffffff;
-  --bg-surface: #f4f4f5;
-  --bg-surface-hover: #e4e4e7;
-  --bg-status: #e4e4e7;
+  --bg-app: #e4e4e7;
+  --bg-panel: #f4f4f5;
+  --bg-surface: #d4d4d8;
+  --bg-surface-hover: #a1a1aa;
+  --bg-status: #d4d4d8;
   
-  --border-color: #e4e4e7;
-  --border-color-light: #d4d4d8;
+  --border-color: #d4d4d8;
+  --border-color-light: #a1a1aa;
   
   --text-primary: #09090b;
   --text-secondary: #3f3f46;

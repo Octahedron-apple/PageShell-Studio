@@ -52,7 +52,7 @@ export default function HomePage() {
       onDrop={handleDrop}
     >
       <div className="flex flex-col items-center justify-center max-w-4xl w-full">
-        <div className="text-6xl mb-6 animate-bounce">✨</div>
+        <img src={`${import.meta.env.BASE_URL}assets/logo2.png`} alt="Studio Logo" className="w-20 h-20 mb-6 object-contain animate-[spin_4s_linear_infinite]" />
         <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-emerald-400 to-purple-500 mb-6 text-center tracking-tight">
           Your Private AI Studio
         </h1>
@@ -65,7 +65,7 @@ export default function HomePage() {
             onClick={onStartProject}
             className="flex flex-col items-center justify-center p-10 bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-2xl cursor-pointer outline-none hover:border-blue-500 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] transition-all group"
           >
-            <img src={`${import.meta.env.BASE_URL}assets/new_project_logo.png`} alt="New Project" className="w-[52px] h-[52px] mb-4 object-contain group-hover:scale-110 transition-transform" />
+            <img src={`${import.meta.env.BASE_URL}assets/new_project_logo.png`} alt="New Project" className="w-24 h-24 mb-4 object-contain group-hover:scale-110 transition-transform" />
             <h3 className="text-2xl font-bold mb-2 text-center text-zinc-100">Start a New Project</h3>
             <p className="text-sm text-[var(--text-muted)] text-center">Chat with the AI to build something from scratch.</p>
           </button>
@@ -74,7 +74,7 @@ export default function HomePage() {
             onClick={() => fileInputRef.current?.click()}
             className="flex flex-col items-center justify-center p-10 bg-[var(--bg-panel)] border border-[var(--border-color)] border-dashed rounded-2xl cursor-pointer outline-none hover:border-emerald-500 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] transition-all group relative overflow-hidden"
           >
-            <img src={`${import.meta.env.BASE_URL}assets/Drag_and_drop_Logo.png`} alt="Drag and Drop" className="w-[52px] h-[52px] mb-4 object-contain group-hover:-translate-y-2 transition-transform relative z-10" />
+            <img src={`${import.meta.env.BASE_URL}assets/Drag_and_drop_Logo.png`} alt="Drag and Drop" className="w-24 h-24 mb-4 object-contain group-hover:-translate-y-2 transition-transform relative z-10" />
             <h3 className="text-2xl font-bold mb-2 text-center text-zinc-100 relative z-10">Drag & Drop a File to Analyze</h3>
             <p className="text-sm text-[var(--text-muted)] text-center relative z-10">Upload a PDF, Excel sheet, or any document.</p>
             <input type="file" ref={fileInputRef} className="hidden" onChange={onFileUpload} />
