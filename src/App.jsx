@@ -18,7 +18,7 @@ function AppContent() {
       <main className="flex-1 flex overflow-hidden relative ml-[64px]">
         <div className="w-full h-full p-2">
           <Routes>
-            <Route path="/home" element={<HomePage />} />
+            <Route path="/home" element={<div className="w-full h-full bg-[var(--bg-panel)] border border-[var(--border-color)] overflow-hidden flex"><FSPage /></div>} />
             <Route path="/fs" element={<div className="w-full h-full bg-[var(--bg-panel)] border border-[var(--border-color)] overflow-hidden flex"><FSPage /></div>} />
             {/* Kept editor mapped to fs for now, since FSPage handles both */}
             <Route path="/editor" element={<div className="w-full h-full bg-[var(--bg-panel)] border border-[var(--border-color)] overflow-hidden flex"><FSPage /></div>} />
@@ -27,8 +27,8 @@ function AppContent() {
             <Route path="/run" element={<div className="w-full h-full bg-[var(--bg-panel)] border border-[var(--border-color)] overflow-hidden flex"><RunPage /></div>} />
             <Route path="/chat" element={<div className="w-full h-full bg-[var(--bg-panel)] border border-[var(--border-color)] overflow-hidden flex"><AIPage /></div>} />
             <Route path="/ai" element={<div className="w-full h-full bg-[var(--bg-panel)] border border-[var(--border-color)] overflow-hidden flex"><AIPage /></div>} />
-            <Route path="/" element={<HomePage />} />
-            <Route path="*" element={<HomePage />} />
+            <Route path="/" element={<div className="w-full h-full bg-[var(--bg-panel)] border border-[var(--border-color)] overflow-hidden flex"><FSPage /></div>} />
+            <Route path="*" element={<div className="w-full h-full bg-[var(--bg-panel)] border border-[var(--border-color)] overflow-hidden flex"><FSPage /></div>} />
           </Routes>
         </div>
       </main>

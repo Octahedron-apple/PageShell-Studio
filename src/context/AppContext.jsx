@@ -13,6 +13,7 @@ const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
   const navigate = useNavigate();
+  const [isHydrated, setIsHydrated] = useState(false);
 
   // --- Theme State ---
   const [activeMediaUrl, setActiveMediaUrl] = useState(null);
@@ -737,6 +738,8 @@ preview_excel()
         if (savedTheme) setTheme(savedTheme);
       } catch (err) {
         console.error('Failed to hydrate state from localforage:', err);
+      } finally {
+        setIsHydrated(true);
       }
     };
     hydrateState();
@@ -791,6 +794,14 @@ preview_excel()
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  if (!isHydrated) {
+    return (
+      <div className="flex items-center justify-center h-screen w-screen bg-[var(--bg-app)] text-[var(--text-muted)] font-mono text-xs tracking-widest uppercase">
+        Hydrating Workspace...
+      </div>
+    );
+  }
 
   return (
     <AppContext.Provider value={{

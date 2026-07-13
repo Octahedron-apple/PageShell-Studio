@@ -50,8 +50,8 @@ export async function extractPdfText(bytes) {
 
 // ─── Chunking ─────────────────────────────────────────────────────────────────
 
-const CHUNK_SIZE = 500;
-const OVERLAP = 50; // chars of overlap to preserve context at boundaries
+const CHUNK_SIZE = 1000;
+const OVERLAP = 150; // chars of overlap to preserve context at boundaries
 
 /**
  * Splits text into ~500-char chunks, snapping to sentence/word boundaries.

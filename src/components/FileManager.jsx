@@ -3,7 +3,7 @@ import Modal from './Modal.jsx';
 import { previewZip } from '../utils/zipUtils.js';
 
 const BINARY_EXTS = ['png', 'jpg', 'jpeg', 'gif', 'xlsx', 'xls', 'whl', 'wasm', 'mp4', 'webp'];
-const TEXT_EXTS   = ['html', 'css', 'js', 'py', 'json', 'md', 'txt', 'csv'];
+const TEXT_EXTS = ['html', 'css', 'js', 'py', 'json', 'md', 'txt', 'csv'];
 const VIEWER_EXTS = ['pdf', 'docx', 'xlsx', 'xls'];
 
 function getIcon(name, isDir) {
@@ -117,19 +117,19 @@ function FileNode({ node, depth, onOpenFile, selectedFiles, onToggleSelect, mode
   );
 }
 
-export default function FileManager({ 
-  files = [], 
+export default function FileManager({
+  files = [],
   activeFile = null,
-  onUpload, 
+  onUpload,
   onCreateFile,
   onExportProject,
   onImportProject,
-  selectedFiles = [], 
-  onToggleSelect, 
-  onOpenFile, 
+  selectedFiles = [],
+  onToggleSelect,
+  onOpenFile,
   onDeleteFile,
   onBulkActionClick,
-  mode = 'sidebar' 
+  mode = 'sidebar'
 }) {
   const uploadRef = useRef(null);
   const importZipRef = useRef(null);
@@ -202,7 +202,7 @@ export default function FileManager({
   };
 
   return (
-    <div 
+    <div
       className={`flex flex-col h-full bg-[var(--bg-app)] box-border overflow-hidden font-sans`}
       style={{
         backgroundColor: isDragging ? '#1a1a24' : '#0d0d10',
@@ -264,7 +264,7 @@ export default function FileManager({
       <div className="flex-1 overflow-y-auto py-1.5">
         {isCreatingFile && (
           <div className="flex items-center gap-2 px-3 py-1.5 min-h-[30px] box-border border-b border-[var(--border-color)]" style={{ paddingLeft: '28px' }}>
-            <span className="w-4 text-xs font-mono text-[var(--accent-primary)] shrink-0 text-center">></span>
+            <span className="w-4 text-xs font-mono text-[var(--accent-primary)] shrink-0 text-center"></span>
             <input
               ref={newFileInputRef}
               type="text"
@@ -306,19 +306,19 @@ export default function FileManager({
       )}
 
       {/* Zip Import Confirmation Modal */}
-      <Modal 
-        isOpen={importModalOpen} 
+      <Modal
+        isOpen={importModalOpen}
         title="Confirm Workspace Import"
         onClose={() => setImportModalOpen(false)}
         actions={
           <>
-            <button 
+            <button
               onClick={() => setImportModalOpen(false)}
               className="px-4 py-2 rounded-lg bg-[var(--bg-surface-hover)] text-[var(--text-primary)] font-medium hover:bg-[var(--bg-panel)] transition-colors border border-[var(--border-color)]"
             >
               Cancel
             </button>
-            <button 
+            <button
               onClick={confirmImport}
               className="px-4 py-2 rounded-lg bg-[var(--accent-primary)] text-white font-bold hover:opacity-90 transition-opacity border-none"
             >

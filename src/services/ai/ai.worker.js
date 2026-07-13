@@ -89,7 +89,16 @@ self.onmessage = async (e) => {
         };
         
         if (tools && tools.length > 0) {
-          request.tools = tools;
+          // WebLLM currently restricts native function calling to Hermes models.
+          // For Qwen2.5, we inject the tool schema into the system prompt and rely on 
+          // the frontend's JSON extraction fallback.
+          const toolsPrompt = `\nYou have access to the following tools:\n${JSON.stringify(tools, null, 2)}\nIf you need to use a tool, you MUST output ONLY a valid JSON object containing "name" and "args" properties, and absolutely no other text.`;
+          
+          if (messages[0] && messages[0].role === 'system') {
+            messages[0].content += toolsPrompt;
+          } else {
+            messages.unshift({ role: 'system', content: toolsPrompt });
+          }
         }
 
         const chunks = await eng.chat.completions.create(request);
