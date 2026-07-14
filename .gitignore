@@ -145,6 +145,4 @@ vite.config.ts.timestamp-*
 AGENTS.md
 
 # Helper scripts and vendor assets
-scripts/
-public/vendor/
 public/models/
