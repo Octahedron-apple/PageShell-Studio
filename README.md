@@ -1,4 +1,14 @@
-# PageShell Studio
+<p align="center">
+  <img src="public/assets/logo.png" alt="PageShell Studio Logo" width="180" />
+</p>
+
+<h1 align="center">PageShell Studio</h1>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
+  <img src="https://img.shields.io/badge/npm-v1.0.0-blue" alt="npm version" />
+  <img src="https://img.shields.io/badge/build-passing-brightgreen" alt="Build Status" />
+</p>
 
 ## Short Description
 PageShell Studio is a powerful, **fully offline web development environment** and **code execution sandbox** running entirely within your browser. Built for OSDHack 2026, it leverages **WebAssembly**, **WebGPU**, and **OPFS** technologies to deliver a desktop-grade IDE experience without requiring a backend server.
