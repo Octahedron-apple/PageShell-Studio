@@ -28,7 +28,7 @@ graph TD
         Py["Pyodide Sandbox"]
         JS["QuickJS Sandbox"]
         RAG["Transformers.js"]
-        Whisper["Whisper.cpp"]
+        WebSpeech["Web Speech API"]
     end
 
     subgraph Storage["Browser Storage"]
@@ -41,7 +41,7 @@ graph TD
     FM <-->|"SyncAccessHandle"| OPFS
     Py <-->|"Native File API"| OPFS
     Chat <-->|"WebGPU"| WebLLM["WebLLM (Local GPU)"]
-    Chat <-->|"Audio"| Whisper
+    Chat <-->|"Audio"| WebSpeech
     Chat <-->|"Semantic Search"| RAG
     RAG <-->|"Fetch Vectors"| OPFS
     WebLLM <-->|"Weights"| IDB

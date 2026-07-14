@@ -1,5 +1,5 @@
-import { loadPyodide } from 'pyodide';
-
+// Load Pyodide globally via importScripts from the public vendor folder
+importScripts(`${import.meta.env.BASE_URL}vendor/pyodide/pyodide.js`);
 let pyodidePromise = null;
 let currentTxId = null;
 
@@ -12,7 +12,7 @@ function getPyodide() {
   if (!pyodidePromise) {
     pyodidePromise = (async () => {
       const pyodide = await loadPyodide({
-        indexURL: `${import.meta.env.BASE_URL}vendor/pyodide_core/`,
+        indexURL: `${import.meta.env.BASE_URL}vendor/pyodide/`,
         stdout: (text) => {
           self.postMessage({ txId: currentTxId, type: 'STDOUT', data: text });
         },

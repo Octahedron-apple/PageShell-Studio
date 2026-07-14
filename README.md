@@ -51,13 +51,13 @@ Our platform pushes the boundaries of edge computing by running all AI models lo
 
 - **WebGPU Code Assistant**: Integrated with **WebLLM** running `Qwen2.5-Coder-1.5B-Instruct` directly on your local GPU. It provides real-time AI code autocompletion and conversational assistance without sending your code to a cloud server.
 - **Semantic Search RAG**: Chat with your PDFs and DOCX files. Powered by **Transformers.js** (`Xenova/all-MiniLM-L6-v2`), the app generates dense vector embeddings in a background worker to provide lightning-fast, highly accurate contextual retrieval using **Cosine Similarity**.
-- **Speech-to-Text**: Fast, on-device audio transcription directly into the AI chat window using the **Whisper.cpp WASM** port.
+- **Speech-to-Text**: Fast audio transcription directly into the AI chat window using the native **Browser Web Speech API**, requiring zero model downloads.
 
 ## Tech Stack
 - **Framework**: React 18 & Vite
 - **Styling**: Tailwind CSS v4 + Vanilla CSS Variables for theming
 - **Editor**: CodeMirror 6
-- **Local AI & ML**: `@mlc-ai/web-llm`, `@xenova/transformers`, `@timur00kh/whisper.wasm`
+- **Local AI & ML**: `@mlc-ai/web-llm`, `@xenova/transformers`
 - **Virtual Environments**: `pyodide` (Python), `quickjs-emscripten` (JavaScript)
 - **Document Parsing**: `mammoth` (DOCX), `pdfjs-dist` (PDF), `xlsx` (Excel)
 
@@ -103,7 +103,7 @@ graph TD
         Py["Pyodide Sandbox"]
         JS["QuickJS Sandbox"]
         RAG["Transformers.js"]
-        Whisper["Whisper.cpp"]
+        WebSpeech["Web Speech API"]
     end
 
     subgraph Storage["Browser Storage"]
@@ -116,7 +116,7 @@ graph TD
     FM <-->|"SyncAccessHandle"| OPFS
     Py <-->|"Native File API"| OPFS
     Chat <-->|"WebGPU"| WebLLM["WebLLM (Local GPU)"]
-    Chat <-->|"Audio"| Whisper
+    Chat <-->|"Audio"| WebSpeech
     Chat <-->|"Semantic Search"| RAG
     RAG <-->|"Fetch Vectors"| OPFS
     WebLLM <-->|"Weights"| IDB
