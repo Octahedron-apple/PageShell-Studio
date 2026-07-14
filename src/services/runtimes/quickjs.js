@@ -45,3 +45,16 @@ export async function runJS(codeString) {
     workerInstance.postMessage({ txId, code: codeString });
   });
 }
+
+export function terminateWorker() {
+  if (worker) {
+    worker.terminate();
+    worker = null;
+    
+    // Reject all pending tasks
+    for (const task of pendingTasks.values()) {
+      task.reject(new Error('Worker terminated'));
+    }
+    pendingTasks.clear();
+  }
+}

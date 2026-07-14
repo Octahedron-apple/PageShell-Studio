@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fileSystemAPI } from '../services/fs/fileSystem.js';
-import { runPython, subscribePythonLogs } from '../services/runtimes/pyodide.js';
-import { runJS } from '../services/runtimes/quickjs.js';
+import { runPython, subscribePythonLogs, terminateWorker as terminatePythonWorker } from '../services/runtimes/pyodide.js';
+import { runJS, terminateWorker as terminateJSWorker } from '../services/runtimes/quickjs.js';
 import { generateCode } from '../services/ai/models.js';
 import { indexDocument, retrieveChunks } from '../services/ai/rag.js';
 import { exportWorkspaceToZip, importWorkspaceFromZip } from '../utils/zipUtils.js';
@@ -258,6 +258,18 @@ button {
       setLogs(prev => [...prev, { type: 'stderr', text: `\nExecution failed: ${err.message}` }]);
       setActivity(prev => prev ? { ...prev, status: 'error', duration: Math.floor((Date.now() - prev.startTime) / 1000) } : null);
     } finally {
+      setLoading(false);
+    }
+  };
+  const handleStop = () => {
+    if (runTarget) {
+      if (runTarget.endsWith('.py')) {
+        terminatePythonWorker();
+      } else if (runTarget.endsWith('.js')) {
+        terminateJSWorker();
+      }
+      setLogs(prev => [...prev, { type: 'stderr', text: `\nExecution manually stopped.` }]);
+      setActivity(prev => prev ? { ...prev, status: 'error', duration: Math.floor((Date.now() - prev.startTime) / 1000) } : null);
       setLoading(false);
     }
   };
@@ -777,12 +789,21 @@ preview_excel()
   useEffect(() => { handleRunRef.current = handleRun; }, [handleRun]);
   useEffect(() => { loadingRef.current = loading; }, [loading]);
 
+  const handleStopRef = useRef(handleStop);
+  useEffect(() => { handleStopRef.current = handleStop; }, [handleStop]);
+
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'F5') {
         e.preventDefault();
-        if (!loadingRef.current) {
-          handleRunRef.current();
+        if (e.shiftKey) {
+          if (loadingRef.current) {
+            handleStopRef.current();
+          }
+        } else {
+          if (!loadingRef.current) {
+            handleRunRef.current();
+          }
         }
       }
     };
@@ -808,8 +829,8 @@ preview_excel()
       selectedFiles, aiLogs, setAiLogs, aiStreaming,
       chatSessions, currentSessionId,
       handleStartNewChat, handleLoadChat, handleDeleteChat,
-      ragStatus, ragIndices,
-      handleRun,
+      ragStatus, ragIndices, handleRun,
+      handleStop,
       handleCreateFile,
       handleUpload, handleOpenFile, handleSaveFile, handleDeleteFile,
       handleExportZip, handleImportZip,

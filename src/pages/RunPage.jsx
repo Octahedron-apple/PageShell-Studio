@@ -15,7 +15,7 @@ function getExecutableScripts(nodes) {
 }
 
 export default function RunPage() {
-  const { logs, setLogs, handleRun, loading, runTarget, setRunTarget, files } = useApp();
+  const { logs, setLogs, handleRun, handleStop, loading, runTarget, setRunTarget, files } = useApp();
   const scripts = getExecutableScripts(files);
 
   useEffect(() => {
@@ -43,18 +43,28 @@ export default function RunPage() {
               <option key={script} value={script}>{script.split('/').pop()}</option>
             ))}
           </select>
-          <button
-            onClick={handleRun}
-            disabled={loading || !runTarget}
-            className={`text-[var(--accent-text)] border-none px-[18px] py-2 rounded-md font-bold text-[13px] transition-all duration-300 outline-none ${
-              loading 
-                ? 'bg-none bg-[var(--color-warning)] shadow-[0_4px_12px_rgba(245,158,11,0.3)] cursor-not-allowed animate-pulse'
-                : 'bg-[var(--accent-primary)] bg-[var(--accent-gradient)] shadow-[0_4px_12px_rgba(79,172,254,0.2)] cursor-pointer'
-            }`}
-            id="run-page-btn"
-          >
-            {loading ? 'Running...' : 'Run (F5)'}
-          </button>
+          {loading ? (
+            <button
+              onClick={handleStop}
+              className="bg-[var(--color-danger)] text-white shadow-[0_4px_12px_rgba(244,63,94,0.3)] border-none px-[18px] py-2 rounded-md font-bold text-[13px] transition-all duration-300 outline-none cursor-pointer"
+              id="stop-page-btn"
+            >
+              Stop (Shift+F5)
+            </button>
+          ) : (
+            <button
+              onClick={handleRun}
+              disabled={!runTarget}
+              className={`text-[var(--accent-text)] border-none px-[18px] py-2 rounded-md font-bold text-[13px] transition-all duration-300 outline-none ${
+                !runTarget
+                  ? 'bg-none bg-[var(--bg-panel)] opacity-50 cursor-not-allowed'
+                  : 'bg-[var(--accent-primary)] bg-[var(--accent-gradient)] shadow-[0_4px_12px_rgba(79,172,254,0.2)] cursor-pointer'
+              }`}
+              id="run-page-btn"
+            >
+              Run (F5)
+            </button>
+          )}
         </div>
       </div>
       <div className="flex-1 overflow-hidden relative">

@@ -64,6 +64,18 @@ export async function runPython(code, inputStringData = '') {
 
 export const executePython = runPython;
 
+export function terminateWorker() {
+  if (worker) {
+    worker.terminate();
+    worker = null;
+    
+    // Reject all pending tasks
+    for (const task of pendingTasks.values()) {
+      task.reject(new Error('Worker terminated'));
+    }
+    pendingTasks.clear();
+  }
+}
 let logSubscriber = null;
 export function subscribePythonLogs(callback) {
   logSubscriber = callback;
