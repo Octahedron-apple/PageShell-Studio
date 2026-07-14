@@ -6,7 +6,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
-  <img src="https://img.shields.io/badge/npm-v1.0.0-blue" alt="npm version" />
+  <img src="https://img.shields.io/badge/version-v0.1.0-blue" alt="version" />
   <img src="https://img.shields.io/badge/build-passing-brightgreen" alt="Build Status" />
 </p>
 
@@ -17,7 +17,7 @@ PageShell Studio is a powerful, **fully offline web development environment** an
 PageShell Studio is deployed online and can be accessed directly at: [https://octahedron-apple.github.io/PageShell-Studio/](https://octahedron-apple.github.io/PageShell-Studio/)
 
 ## Problem Statement
-Traditional IDEs and AI assistants require continuous internet connectivity and send private code and data to external servers, raising severe privacy concerns and limiting offline capabilities. While local AI solutions exist, they present a massive barrier to entry. For an average user or layman, installing and configuring tools like **Ollama** locally on bare-metal hardware is an incredibly complex, intimidating process. Furthermore, setting up the surrounding ecosystem—such as hooking up the local models to an IDE, installing **Python environments**, or configuring **RAG pipelines**—requires significant technical expertise, leaving these powerful local AI capabilities out of reach for most people.
+Cloud-based IDEs and AI tools compromise privacy by sending your code to external servers and require constant internet connectivity. While local AI solutions (like **Ollama**) solve this, they present a massive barrier to entry. Installing bare-metal models, configuring Python environments, and setting up complex RAG pipelines requires significant technical expertise, leaving these powerful tools out of reach for the average user.
 
 ## Solution Overview
 PageShell Studio solves this by moving the entire development lifecycle directly into the client's web browser, instantly democratizing access to local AI. There are no installations, no terminal configurations, and no backend servers required.
@@ -65,7 +65,10 @@ Our platform pushes the boundaries of edge computing by running all AI models lo
 
 ### Prerequisites
 - Node.js (v18+)
-- A modern browser with WebGPU enabled (Chrome 113+ or Edge 113+)
+- A modern Chromium-based desktop browser with WebGPU enabled (Chrome 113+ or Edge 113+).
+
+> [!NOTE]  
+> Mobile browsers and Firefox/Safari have limited or no WebGPU support. A desktop Chromium browser is strictly recommended to run the AI and WebAssembly features smoothly.
 
 ### Installation
 1. Clone the repository:
@@ -87,6 +90,38 @@ npm run dev
 **Architecture Note**:
 Read the full architecture and sandboxing overview here: [ARCHITECTURE.md](./ARCHITECTURE.md)
 
+### System Architecture
+```mermaid
+graph TD
+    subgraph UI["React Main Thread"]
+        Editor["Code Editor"]
+        FM["File Manager"]
+        Chat["AI Chat"]
+    end
+
+    subgraph Workers["Web Workers"]
+        Py["Pyodide Sandbox"]
+        JS["QuickJS Sandbox"]
+        RAG["Transformers.js"]
+        Whisper["Whisper.cpp"]
+    end
+
+    subgraph Storage["Browser Storage"]
+        OPFS[("Origin Private File System")]
+        IDB[("IndexedDB Model Cache")]
+    end
+
+    Editor <-->|"eval()"| Py
+    Editor <-->|"eval()"| JS
+    FM <-->|"SyncAccessHandle"| OPFS
+    Py <-->|"Native File API"| OPFS
+    Chat <-->|"WebGPU"| WebLLM["WebLLM (Local GPU)"]
+    Chat <-->|"Audio"| Whisper
+    Chat <-->|"Semantic Search"| RAG
+    RAG <-->|"Fetch Vectors"| OPFS
+    WebLLM <-->|"Weights"| IDB
+```
+
 ## Usage Instructions
 1. Open your browser and navigate to the local server URL provided by Vite. Use `localhost` or HTTPS, as WebGPU and OPFS require secure contexts.
 2. Drag and drop your project files (or Zip archives) into the File Manager.
@@ -100,13 +135,22 @@ To reduce friction and allow you to test our offline Data Analysis and RAG capab
 - **`financial_data.xlsx`**: A sample spreadsheet. Check its box in the File Manager, open the AI Assistant, and ask questions like *"What was the Net Profit for Q4?"* to test our local spreadsheet parsing and context injection.
 - **`company_policy.docx`**: A sample corporate document. Open it in the Documents Viewer or ask the AI *"What is the remote work policy?"* to test our local text extraction, WASM vector embeddings, and Semantic Search RAG pipeline powered by Cosine Similarity.
 
+## Challenges We Faced
+
+Building a fully local IDE presented significant technical hurdles:
+- **Cross-Origin Isolation & SharedArrayBuffers**: WebGPU and fast WebAssembly require \`SharedArrayBuffer\`, which mandates strict COOP/COEP headers. This broke standard cross-origin asset fetching, forcing us to meticulously manage CORS headers and local proxying for massive AI model weights.
+- **Sandboxing & Memory Leaks**: Running untrusted JavaScript via \`quickjs-emscripten\` required manual C-style memory management. Without explicit \`.dispose()\` calls on returned handles, the WASM linear memory would exhaust and silently crash the browser tab within seconds.
+- **Pyodide & The OPFS Bridge**: Pyodide operates in its own virtual MEMFS. To allow Python scripts to natively read the user's files without manual byte-conversion overhead, we successfully mounted the native OPFS browser directory handle directly onto the \`/workspace\` virtual volume inside the Pyodide Web Worker.
+
 ## Known Limitations or Future Scope
 
 ### Known Limitations
 - **File Size**: Storing massive files or hundreds of documents in the OPFS workspace may be subject to browser storage quotas, and initial model downloads for AI require significant bandwidth (up to ~900MB).
 - **Performance Overhead**: There is a slight speed reduction when running models through WebGPU in the browser compared to running them on bare-metal through native engines like Ollama. This is due to browser sandboxing and translation overhead.
+- **Cache Volatility**: Because all data is stored entirely locally in the browser, if a user completely clears their site data/cache, all workspace files and downloaded WebGPU models will be lost.
 
 ### Future Scope
+- **Electron Port**: Wrapping the application in Electron to provide a native desktop experience with direct file system access, bypassing browser storage limits.
 - **Automation Capabilities**: Advanced scripting and macro workflows for browser-based task automation.
 - **Better AI Tooling**: Enhanced AI integrations, larger models, and improved prompt orchestration for more complex reasoning.
 
