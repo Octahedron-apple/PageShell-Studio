@@ -42,11 +42,11 @@ export default function Sidebar() {
       {/* Nav Links */}
       <nav className="flex flex-col gap-2 mt-4 flex-1">
         {navItems.map(({ id, icon, label }) => {
-          const isActive = currentPage === id || (currentPage === 'files' && id === 'fs');
+          const isActive = currentPage === id;
           return (
             <button
               key={id}
-              onClick={() => navigate(`/${id === 'fs' ? 'files/fs' : id}`)}
+              onClick={() => navigate(`/${id}`)}
               className={`relative flex items-center h-12 w-full px-4 cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--accent-primary)] group transition-colors ${
                 isActive 
                   ? 'text-white' 

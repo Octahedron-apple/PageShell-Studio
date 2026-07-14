@@ -52,12 +52,12 @@ export default function HomePage() {
       onDrop={handleDrop}
     >
       <div className="flex flex-col items-center justify-center max-w-4xl w-full">
-        <img src={`${import.meta.env.BASE_URL}assets/logo2.png`} alt="Studio Logo" className="w-20 h-20 mb-6 object-contain animate-[spin_4s_linear_infinite]" />
+        <img src={`${import.meta.env.BASE_URL}assets/logo2.png`} alt="Studio Logo" className="w-[140px] h-[140px] mb-6 object-contain animate-[spin_4s_linear_infinite]" />
         <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-emerald-400 to-purple-500 mb-6 text-center tracking-tight">
-          Your Private AI Studio
+          PageShell Studio
         </h1>
         <p className="text-[var(--text-muted)] text-xl mb-16 text-center max-w-2xl leading-relaxed">
-          The power of advanced AI right on your device. Fast, secure, and ready to build.
+          A fully local AI workspace. Your models, your files, your data — nothing leaves this device.
         </p>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full max-w-3xl">
@@ -65,18 +65,18 @@ export default function HomePage() {
             onClick={onStartProject}
             className="flex flex-col items-center justify-center p-10 bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-2xl cursor-pointer outline-none hover:border-blue-500 hover:shadow-[0_0_30px_rgba(59,130,246,0.15)] transition-all group"
           >
-            <img src={`${import.meta.env.BASE_URL}assets/new_project_logo.png`} alt="New Project" className="w-24 h-24 mb-4 object-contain group-hover:scale-110 transition-transform" />
-            <h3 className="text-2xl font-bold mb-2 text-center text-zinc-100">Start a New Project</h3>
-            <p className="text-sm text-[var(--text-muted)] text-center">Chat with the AI to build something from scratch.</p>
+            <img src={`${import.meta.env.BASE_URL}assets/new_project_logo.png`} alt="New Project" className="w-[168px] h-[168px] mb-4 object-contain group-hover:scale-110 transition-transform" />
+            <h3 className="text-2xl font-bold mb-2 text-center text-zinc-100">New Project</h3>
+            <p className="text-sm text-[var(--text-muted)] text-center">Describe what you want to build and let the AI generate it for you.</p>
           </button>
 
           <button 
             onClick={() => fileInputRef.current?.click()}
             className="flex flex-col items-center justify-center p-10 bg-[var(--bg-panel)] border border-[var(--border-color)] border-dashed rounded-2xl cursor-pointer outline-none hover:border-emerald-500 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] transition-all group relative overflow-hidden"
           >
-            <img src={`${import.meta.env.BASE_URL}assets/Drag_and_drop_Logo.png`} alt="Drag and Drop" className="w-24 h-24 mb-4 object-contain group-hover:-translate-y-2 transition-transform relative z-10" />
-            <h3 className="text-2xl font-bold mb-2 text-center text-zinc-100 relative z-10">Drag & Drop a File to Analyze</h3>
-            <p className="text-sm text-[var(--text-muted)] text-center relative z-10">Upload a PDF, Excel sheet, or any document.</p>
+            <img src={`${import.meta.env.BASE_URL}assets/Drag_and_drop_Logo.png`} alt="Drag and Drop" className="w-[168px] h-[168px] mb-4 object-contain group-hover:-translate-y-2 transition-transform relative z-10" />
+            <h3 className="text-2xl font-bold mb-2 text-center text-zinc-100 relative z-10">Analyze a Document</h3>
+            <p className="text-sm text-[var(--text-muted)] text-center relative z-10">Drop a PDF, spreadsheet, Word doc, or plain text file to get started.</p>
             <input type="file" ref={fileInputRef} className="hidden" onChange={onFileUpload} />
           </button>
         </div>

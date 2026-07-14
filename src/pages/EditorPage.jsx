@@ -14,7 +14,7 @@ export default function EditorPage() {
     currentPage, activeMediaUrl,
     isSearchOpen, setIsSearchOpen,
     handleRun, handleUpload, handleCreateFile, handleOpenFile, handleSaveFile,
-    handleExportZip, handleImportZip,
+    handleExportZip, handleImportZip, handleDeleteFile,
     selectedFiles, handleToggleFileSelect,
     aiLogs, handleQuery, aiStreaming, ragStatus, ragIndices,
     chatSessions, currentSessionId, handleStartNewChat, handleLoadChat, handleDeleteChat

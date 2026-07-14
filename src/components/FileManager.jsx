@@ -281,7 +281,7 @@ export default function FileManager({
           </div>
         )}
         {nodes.length === 0 && !isCreatingFile ? (
-          <div className="px-4 py-6 text-xs text-[var(--text-muted)] text-center leading-relaxed italic">No files yet. Upload or run a script to create files.</div>
+          <div className="px-4 py-6 text-xs text-[var(--text-muted)] text-center leading-relaxed italic">Workspace is empty. Upload a file or run a script to get started.</div>
         ) : (
           nodes.map(node => (
             <FileNode
@@ -301,7 +301,7 @@ export default function FileManager({
 
       {onToggleSelect && (
         <div className="px-3.5 py-2 text-[11px] text-[var(--text-muted)] border-t border-[var(--border-color)] italic shrink-0">
-          ☑ Check files to include as AI context
+          Select files below to include as AI context
         </div>
       )}
 

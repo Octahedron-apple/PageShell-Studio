@@ -12,7 +12,7 @@ export default function AIAssistant({
   const [whisperStatus, setWhisperStatus] = useState('');
   const [showHistory, setShowHistory] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
-  const [statusMessage, setStatusMessage] = useState('AI worker offline. Submit a query to trigger model loading.');
+  const [statusMessage, setStatusMessage] = useState('Engine offline — send a message to initialize.');
   
   useEffect(() => {
     subscribeAIStatus(status => setStatusMessage(status));
@@ -111,14 +111,14 @@ export default function AIAssistant({
       <div className="flex justify-between items-center px-5 py-3 bg-[var(--bg-panel)] border-b border-[var(--border-color)]">
         <div className="flex items-center gap-2">
           <span className="text-base">🤖</span>
-          <span className="text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">Local AI Assistant</span>
+          <span className="text-sm font-bold uppercase tracking-wider text-[var(--text-secondary)]">AI Assistant</span>
         </div>
         <div className="flex gap-2">
           <button onClick={() => { setShowPrompt(!showPrompt); setShowHistory(false); }} className="bg-transparent text-[var(--text-secondary)] text-[11px] cursor-pointer outline-none border border-[var(--border-color)] rounded px-2 py-0.5 hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]">
-            {showPrompt ? 'Back' : '⚙️ Prompt'}
+            {showPrompt ? '← Back' : 'System Prompt'}
           </button>
           <button onClick={() => { setShowHistory(!showHistory); setShowPrompt(false); }} className="bg-transparent text-[var(--text-secondary)] text-[11px] cursor-pointer outline-none border border-[var(--border-color)] rounded px-2 py-0.5 hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]">
-            {showHistory ? 'Back' : '📜 History'}
+            {showHistory ? '← Back' : 'History'}
           </button>
           <button onClick={() => { onNewChat?.(); setShowHistory(false); setShowPrompt(false); }} className="bg-transparent text-[var(--text-secondary)] text-[11px] cursor-pointer outline-none border border-[var(--border-color)] rounded px-2 py-0.5 hover:text-[var(--text-primary)] hover:bg-[var(--bg-surface)]">
             New Chat
@@ -130,7 +130,7 @@ export default function AIAssistant({
         <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-2">
           <h3 className="text-[var(--text-primary)] text-sm font-bold m-0 mb-2">Chat History</h3>
           {chatSessions.length === 0 ? (
-            <div className="text-[var(--text-muted)] text-xs">No previous chats found.</div>
+            <div className="text-[var(--text-muted)] text-xs">No saved sessions yet.</div>
           ) : (
             chatSessions.map(session => (
               <div 
@@ -156,7 +156,7 @@ export default function AIAssistant({
       ) : showPrompt ? (
         <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-3">
           <h3 className="text-[var(--text-primary)] text-sm font-bold m-0 mb-1">System Prompt</h3>
-          <p className="text-xs text-[var(--text-muted)] m-0 mb-2">Edit the core instructions that guide the AI assistant's behavior.</p>
+          <p className="text-xs text-[var(--text-muted)] m-0 mb-2">Define the AI's core behavior and persona for this session.</p>
           <textarea 
             value={customSystemPrompt}
             onChange={(e) => setCustomSystemPrompt(e.target.value)}
@@ -169,7 +169,7 @@ export default function AIAssistant({
           <div className="px-4 py-2 bg-[var(--bg-surface)] border-b border-[var(--border-color)] text-xs flex gap-1.5 items-center overflow-hidden">
         <span className="text-[var(--text-muted)] font-bold">Context Ingestion:</span>
         {selectedFiles.length === 0 ? (
-          <span className="text-[var(--text-muted)] italic">None (check files in sidebar to attach)</span>
+          <span className="text-[var(--text-muted)] italic">No files attached — select files in the sidebar to add context</span>
         ) : (
           <span className="text-[var(--accent-primary)] font-semibold truncate">{selectedFiles.map(f => f.split('/').pop()).join(', ')}</span>
         )}
@@ -189,19 +189,50 @@ export default function AIAssistant({
       {/* Status Bar — always visible, highlighted during downloads */}
       {(() => {
         const isDownloading = statusMessage && statusMessage.includes('Downloading');
+        const isLoading = statusMessage && (statusMessage.includes('%') || statusMessage.includes('Loading'));
+        
+        // Extract percentage from messages like "Loading WebGPU model: 47% - ..."
+        const pctMatch = statusMessage && statusMessage.match(/(\d+)%/);
+        const pct = pctMatch ? parseInt(pctMatch[1], 10) : null;
+
+        const whisperPctMatch = whisperStatus && whisperStatus.match(/(\d+)%/);
+        const whisperPct = whisperPctMatch ? parseInt(whisperPctMatch[1], 10) : null;
+
         return (
           <div className={`flex flex-col gap-1 px-4 py-[7px] bg-[var(--bg-status)] border-b border-[var(--border-color)] text-[11px] transition-colors duration-300 shrink-0 ${isDownloading ? 'bg-[rgba(245,158,11,0.08)] border-b border-[rgba(245,158,11,0.25)]' : ''}`}>
             <div className="flex items-center gap-2">
-              <span className={`w-1.5 h-1.5 rounded-full bg-[#3498db] shadow-[0_0_6px_#3498db] shrink-0 ${isDownloading ? 'bg-[var(--color-warning)] shadow-[0_0_8px_var(--color-warning)]' : ''}`} />
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isLoading ? 'bg-[var(--color-warning)] shadow-[0_0_8px_var(--color-warning)] animate-pulse' : 'bg-[#3498db] shadow-[0_0_6px_#3498db]'}`} />
               <span className="text-[var(--text-muted)] flex-1 truncate">{statusMessage || 'AI worker offline. Send a query to load the model.'}</span>
               {isDownloading && (
                 <span className="text-[10px] font-bold text-[var(--color-warning)] bg-[rgba(245,158,11,0.12)] border border-[rgba(245,158,11,0.3)] px-[7px] py-[2px] rounded-[10px] shrink-0">↓ Downloading</span>
               )}
             </div>
+            {pct !== null && (
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex-1 h-[3px] bg-[var(--bg-surface)] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${pct}%`, background: 'linear-gradient(90deg, #3498db, var(--accent-primary))' }}
+                  />
+                </div>
+                <span className="text-[10px] font-mono text-[var(--text-muted)] shrink-0 w-[30px] text-right">{pct}%</span>
+              </div>
+            )}
             {whisperStatus && (
               <div className="flex items-center gap-2 mt-1">
                 <span className={`w-1.5 h-1.5 rounded-full ${isRecording ? 'bg-red-500 shadow-[0_0_6px_#ef4444] animate-pulse' : 'bg-emerald-500 shadow-[0_0_6px_#10b981]'} shrink-0`} />
                 <span className="text-[var(--text-muted)] flex-1 truncate">Whisper: {whisperStatus}</span>
+              </div>
+            )}
+            {whisperPct !== null && (
+              <div className="flex items-center gap-2 mt-0.5">
+                <div className="flex-1 h-[3px] bg-[var(--bg-surface)] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${whisperPct}%`, background: 'linear-gradient(90deg, #10b981, #00ff41)' }}
+                  />
+                </div>
+                <span className="text-[10px] font-mono text-[var(--text-muted)] shrink-0 w-[30px] text-right">{whisperPct}%</span>
               </div>
             )}
           </div>
@@ -212,10 +243,10 @@ export default function AIAssistant({
       <div className="flex-1 p-4 overflow-y-auto flex flex-col gap-3" id="ai-chat-body">
         {aiLogs.length === 0 ? (
           <div className="bg-[var(--bg-panel)] border border-[var(--border-color)] rounded-lg p-4 mt-2.5">
-            <h4 className="m-0 mb-2 text-sm text-[var(--accent-primary)]">Qwen2.5-Coder 1.5B Instruct</h4>
+            <h4 className="m-0 mb-2 text-sm text-[var(--accent-primary)]">Qwen2.5-Coder 1.5B</h4>
             <p className="m-0 text-xs text-[var(--text-muted)] leading-relaxed">
-              Offline WebGPU assistant. ~900MB of weights are downloaded and cached on first use.
-              Check files in the sidebar to attach them as context.
+              Runs fully offline via WebGPU. Model weights (~900 MB) are downloaded and cached locally on first use.
+              Select files in the sidebar to attach them as context for your query.
             </p>
           </div>
         ) : (
@@ -274,7 +305,7 @@ export default function AIAssistant({
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={aiStreaming ? "AI is typing..." : "Ask AI about selected files..."}
+          placeholder={aiStreaming ? 'Generating response...' : 'Ask anything about your files or project...'}
           className={`flex-1 bg-[var(--bg-surface)] border border-[var(--border-color)] rounded-md text-[var(--text-primary)] px-3 py-2 text-[13px] outline-none placeholder:text-[var(--text-muted)] ${aiStreaming ? 'bg-[var(--bg-panel)] text-[var(--text-muted)] cursor-not-allowed' : ''}`}
           disabled={aiStreaming}
           id="ai-query-input"
