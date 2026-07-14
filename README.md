@@ -21,14 +21,20 @@ PageShell Studio solves this by moving the entire development lifecycle directly
 - **Premium UI/UX**: Features a modern, sleek interface with a dynamic Light/Dark mode toggle driven by custom CSS variables.
 
 ## Screenshots
-### File Manager
-![PageShell Studio File Manager](docs/assets/pageshell-file-manager.png)
+### Home Dashboard
+![PageShell Studio Home](docs/assets/pageshell-home.png)
 
 ### Code Editor
 ![PageShell Studio Code Editor](docs/assets/pageshell-code-editor.png)
 
+### Smart Sort
+![PageShell Studio Smart Sort](docs/assets/pageshell-smart-sort.png)
+
 ### Local AI Assistant
 ![PageShell Studio AI Assistant](docs/assets/pageshell-ai-assistant.png)
+
+### Live Web Preview
+![PageShell Studio Web Preview](docs/assets/pageshell-web-preview.png)
 
 ## On Device AI Explanation
 Our platform pushes the boundaries of edge computing by running all AI models locally on the user's device via **WebAssembly** and **WebGPU**:
@@ -77,6 +83,12 @@ Read the full architecture and sandboxing overview here: [ARCHITECTURE.md](./ARC
 3. Open the **Code Editor** to write your scripts, or the **Documents Viewer** to read PDFs and DOCX files.
 4. Select files using the checkboxes in the File Manager to attach them as context for the **AI Assistant**.
 5. Switch to the **Run** tab to execute Python/JavaScript code natively in the browser.
+
+### 🧪 Quick Testing with Sample Files
+To reduce friction and allow you to test our offline Data Analysis and RAG capabilities instantly, PageShell Studio automatically pre-loads **three sample files** into your workspace on first boot:
+- **`sample_code.py`**: Open this in the Code tab and hit Run to test our offline Python/Pyodide execution environment.
+- **`financial_data.xlsx`**: A sample spreadsheet. Check its box in the File Manager, open the AI Assistant, and ask questions like *"What was the Net Profit for Q4?"* to test our local spreadsheet parsing and context injection.
+- **`company_policy.docx`**: A sample corporate document. Open it in the Documents Viewer or ask the AI *"What is the remote work policy?"* to test our local text extraction, WASM vector embeddings, and Semantic Search RAG pipeline powered by Cosine Similarity.
 
 ## Known Limitations or Future Scope
 

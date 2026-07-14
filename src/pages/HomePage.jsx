@@ -47,16 +47,16 @@ export default function HomePage() {
 
   return (
     <div 
-      className="flex flex-col items-center justify-center w-full h-full bg-[var(--bg-app)] text-[var(--text-primary)] p-8 box-border"
+      className="flex flex-col items-center w-full min-h-full overflow-y-auto bg-[var(--bg-app)] text-[var(--text-primary)] p-8 py-12 box-border"
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <div className="flex flex-col items-center justify-center max-w-4xl w-full">
-        <img src={`${import.meta.env.BASE_URL}assets/logo2.png`} alt="Studio Logo" className="w-[140px] h-[140px] mb-6 object-contain animate-[spin_4s_linear_infinite]" />
+      <div className="flex flex-col items-center max-w-4xl w-full">
+        <img src={`${import.meta.env.BASE_URL}assets/logo2.png`} alt="Studio Logo" className="w-[180px] h-[180px] mb-6 object-contain animate-[spin_4s_linear_infinite]" />
         <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-emerald-400 to-purple-500 mb-6 text-center tracking-tight">
           PageShell Studio
         </h1>
-        <p className="text-[var(--text-muted)] text-xl mb-16 text-center max-w-2xl leading-relaxed">
+        <p className="text-[var(--text-muted)] text-xl mb-12 text-center max-w-2xl leading-relaxed">
           A fully local AI workspace. Your models, your files, your data — nothing leaves this device.
         </p>
 

@@ -162,6 +162,8 @@ export function AppProvider({ children }) {
       await fileSystemAPI.readFile('workspace/index.html');
     } catch {
       const encoder = new TextEncoder();
+      
+      // Basic Web Project
       await fileSystemAPI.writeFile('workspace/index.html', encoder.encode(`<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -207,30 +209,23 @@ button {
       await fileSystemAPI.writeFile('workspace/script.js', encoder.encode(`document.getElementById('clickMe').addEventListener('click', () => {
     alert('Hello from PageShell Studio!');
 });`));
-      await fileSystemAPI.writeFile('workspace/Python scripts/main.py', encoder.encode(`import pandas as pd
-import numpy as np
 
-print("--- Initializing Python Analysis ---")
+      // Fetch and seed samples
+      try {
+        const baseUrl = import.meta.env.BASE_URL;
+        const [pyRes, xlsxRes, docxRes] = await Promise.all([
+          fetch(`${baseUrl}samples/sample_code.py`),
+          fetch(`${baseUrl}samples/financial_data.xlsx`),
+          fetch(`${baseUrl}samples/company_policy.docx`)
+        ]);
 
-try:
-    df = pd.read_excel("data.xlsx")
-    print("🚀 Natively loaded 'data.xlsx' from OPFS workspace!")
-    print("\\nSummary Statistics:")
-    print(df.describe())
-    print("\\nFirst 5 rows:")
-    print(df.head())
-except Exception as e:
-    print("⚠️ 'data.xlsx' not found. Creating a template data.xlsx for you...")
-    df = pd.DataFrame({
-        "Employee": ["Alice Smith", "Bob Jones", "Charlie Brown", "Diana Prince", "Evan Wright"],
-        "Department": ["Engineering", "Product", "Engineering", "Design", "Product"],
-        "Salary": [85000, 92000, 78000, 88000, 95000],
-        "Performance_Score": [4.8, 4.2, 4.5, 4.9, 4.0]
-    })
-    df.to_excel("data.xlsx", index=False)
-    print("💾 Successfully saved template data.xlsx to OPFS workspace!")
-    print("Re-run the script to perform automated excel sheet reading!")
-`));
+        if (pyRes.ok) await fileSystemAPI.writeFile('workspace/sample_code.py', new Uint8Array(await pyRes.arrayBuffer()));
+        if (xlsxRes.ok) await fileSystemAPI.writeFile('workspace/financial_data.xlsx', new Uint8Array(await xlsxRes.arrayBuffer()));
+        if (docxRes.ok) await fileSystemAPI.writeFile('workspace/company_policy.docx', new Uint8Array(await docxRes.arrayBuffer()));
+      } catch (err) {
+        console.error('Failed to seed sample files:', err);
+      }
+
       await refreshFiles();
     }
   };
