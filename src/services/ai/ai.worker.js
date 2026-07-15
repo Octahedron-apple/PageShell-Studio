@@ -10,63 +10,64 @@ let fallbackGenerator = null;
 // Using a lightweight coder model available in WebLLM's prebuilt registry.
 const modelId = "Qwen2.5-Coder-1.5B-Instruct-q4f16_1-MLC";
 
+let enginePromise = null;
 async function getEngine() {
-  if (useFallback) {
-    return null;
-  }
-  if (!engine) {
-    self.postMessage({ type: 'STATUS', message: 'Initializing WebLLM WebGPU Engine...' });
+  if (useFallback) return null;
+  if (engine) return engine;
+  
+  if (!enginePromise) {
+    enginePromise = (async () => {
+      self.postMessage({ type: 'STATUS', message: 'Initializing WebLLM WebGPU Engine...' });
+      
+      const initProgressCallback = (progress) => {
+        const pct = Math.round(progress.progress * 100);
+        self.postMessage({ type: 'STATUS', message: `Loading WebGPU model: ${pct}% - ${progress.text}` });
+      };
 
-    const initProgressCallback = (progress) => {
-      // progress.progress is a float from 0 to 1
-      const pct = Math.round(progress.progress * 100);
-      self.postMessage({
-        type: 'STATUS',
-        message: `Loading WebGPU model: ${pct}% - ${progress.text}`
-      });
-    };
-
-    try {
-      engine = await CreateMLCEngine(
-        modelId,
-        { initProgressCallback }
-      );
-      self.postMessage({ type: 'STATUS', message: 'Model ready with WebGPU acceleration!' });
-    } catch (e) {
-      console.warn("Failed to initialize WebLLM with WebGPU:", e);
-      useFallback = true;
-      self.postMessage({ type: 'STATUS', message: 'WebGPU not supported or initialization failed. Switching to CPU/WASM fallback...' });
-    }
+      try {
+        const eng = await CreateMLCEngine(modelId, { initProgressCallback });
+        self.postMessage({ type: 'STATUS', message: 'Model ready with WebGPU acceleration!' });
+        engine = eng;
+        return eng;
+      } catch (e) {
+        console.warn("Failed to initialize WebLLM with WebGPU:", e);
+        useFallback = true;
+        self.postMessage({ type: 'STATUS', message: 'WebGPU not supported or initialization failed. Switching to CPU/WASM fallback...' });
+        return null;
+      }
+    })();
   }
-  return engine;
+  return enginePromise;
 }
 
+let fallbackGeneratorPromise = null;
 async function getFallbackGenerator() {
-  if (!fallbackGenerator) {
-    self.postMessage({ type: 'STATUS', message: 'Initializing CPU fallback (Transformers.js)...' });
+  if (fallbackGenerator) return fallbackGenerator;
+  
+  if (!fallbackGeneratorPromise) {
+    fallbackGeneratorPromise = (async () => {
+      self.postMessage({ type: 'STATUS', message: 'Initializing CPU fallback (Transformers.js)...' });
 
-    const progress_callback = (progress) => {
-      if (progress.status === 'progress') {
-        const pct = Math.round(progress.progress);
-        self.postMessage({
-          type: 'STATUS',
-          message: `Loading fallback model (${progress.file}): ${pct}%`
-        });
+      const progress_callback = (progress) => {
+        if (progress.status === 'progress') {
+          const pct = Math.round(progress.progress);
+          self.postMessage({ type: 'STATUS', message: `Loading fallback model (${progress.file}): ${pct}%` });
+        }
+      };
+
+      try {
+        const gen = await pipeline('text-generation', 'Xenova/Qwen1.5-0.5B-Chat', { progress_callback });
+        self.postMessage({ type: 'STATUS', message: 'Fallback model ready (CPU/WASM)!' });
+        fallbackGenerator = gen;
+        return gen;
+      } catch (err) {
+        console.error("Failed to initialize Transformers.js fallback:", err);
+        self.postMessage({ type: 'ERROR', error: `CPU fallback failed to initialize: ${err.message}` });
+        throw err;
       }
-    };
-
-    try {
-      fallbackGenerator = await pipeline('text-generation', 'Xenova/Qwen1.5-0.5B-Chat', {
-        progress_callback
-      });
-      self.postMessage({ type: 'STATUS', message: 'Fallback model ready (CPU/WASM)!' });
-    } catch (err) {
-      console.error("Failed to initialize Transformers.js fallback:", err);
-      self.postMessage({ type: 'ERROR', error: `CPU fallback failed to initialize: ${err.message}` });
-      throw err;
-    }
+    })();
   }
-  return fallbackGenerator;
+  return fallbackGeneratorPromise;
 }
 
 self.onmessage = async (e) => {
@@ -102,60 +103,82 @@ self.onmessage = async (e) => {
         }
       }
 
-      const eng = await getEngine();
+      let eng = null;
+      try {
+        eng = await getEngine();
+      } catch (e) {
+        console.warn("getEngine failed:", e);
+        useFallback = true;
+        engine = null;
+      }
 
-      if (eng) {
-        const request = {
-          messages,
-          temperature: 0.3,
-          stream: stream,
-          max_tokens: 2048,
-        };
+      let generationSuccessful = false;
 
-        const chunks = await eng.chat.completions.create(request);
+      if (eng && !useFallback) {
+        try {
+          const request = {
+            messages,
+            temperature: 0.3,
+            stream: stream,
+            max_tokens: 2048,
+          };
 
-        let finalOutput = '';
-        let toolCalls = [];
+          const chunks = await eng.chat.completions.create(request);
 
-        for await (const chunk of chunks) {
-          const token = chunk.choices[0]?.delta?.content || '';
-          finalOutput += token;
-          
-          // Accumulate tool calls natively
-          if (chunk.choices[0]?.delta?.tool_calls) {
-            for (const tcDelta of chunk.choices[0].delta.tool_calls) {
-              const index = tcDelta.index;
-              if (!toolCalls[index]) {
-                toolCalls[index] = {
-                  id: tcDelta.id || '',
-                  type: 'function',
-                  function: { name: tcDelta.function?.name || '', arguments: tcDelta.function?.arguments || '' }
-                };
-              } else {
-                if (tcDelta.function?.name) toolCalls[index].function.name += tcDelta.function.name;
-                if (tcDelta.function?.arguments) toolCalls[index].function.arguments += tcDelta.function.arguments;
+          let finalOutput = '';
+          let toolCalls = [];
+
+          for await (const chunk of chunks) {
+            const token = chunk.choices[0]?.delta?.content || '';
+            finalOutput += token;
+            
+            // Accumulate tool calls natively
+            if (chunk.choices[0]?.delta?.tool_calls) {
+              for (const tcDelta of chunk.choices[0].delta.tool_calls) {
+                const index = tcDelta.index;
+                if (!toolCalls[index]) {
+                  toolCalls[index] = {
+                    id: tcDelta.id || '',
+                    type: 'function',
+                    function: { name: tcDelta.function?.name || '', arguments: tcDelta.function?.arguments || '' }
+                  };
+                } else {
+                  if (tcDelta.function?.name) toolCalls[index].function.name += tcDelta.function.name;
+                  if (tcDelta.function?.arguments) toolCalls[index].function.arguments += tcDelta.function.arguments;
+                }
               }
+            }
+
+            // Stream token to main thread if streaming is enabled
+            if (token && stream) {
+              self.postMessage({ type: 'TOKEN', token, requestId });
             }
           }
 
-          // Stream token to main thread if streaming is enabled
-          if (token && stream) {
-            self.postMessage({ type: 'TOKEN', token, requestId });
+          // Clean up tool calls array
+          const finalToolCalls = toolCalls.filter(tc => tc && tc.function && tc.function.name);
+
+          // Signal completion
+          self.postMessage({ 
+            type: 'COMPLETE', 
+            output: finalOutput,
+            tool_calls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
+            requestId
+          });
+
+          generationSuccessful = true;
+        } catch (err) {
+          console.warn("WebLLM generation failed mid-flight, resetting engine and falling back to CPU:", err);
+          engine = null;
+          useFallback = true;
+          self.postMessage({ type: 'STATUS', message: 'WebLLM error encountered. Falling back to CPU/WASM...' });
+          if (eng && typeof eng.unload === 'function') {
+            try { await eng.unload(); } catch(_) {}
           }
         }
+      }
 
-        // Clean up tool calls array
-        const finalToolCalls = toolCalls.filter(tc => tc && tc.function && tc.function.name);
-
-        // Signal completion
-        self.postMessage({ 
-          type: 'COMPLETE', 
-          output: finalOutput,
-          tool_calls: finalToolCalls.length > 0 ? finalToolCalls : undefined,
-          requestId
-        });
-
-      } else {
+      if (!generationSuccessful) {
         // CPU fallback generation via Transformers.js
         const gen = await getFallbackGenerator();
 
