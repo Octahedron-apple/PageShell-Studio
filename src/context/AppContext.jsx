@@ -609,12 +609,22 @@ preview_excel()
         const jsonMatch = fullOutput.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           try {
-            const parsed = JSON.parse(jsonMatch[0]);
+            let rawJson = jsonMatch[0];
+            // Escape literal newlines inside double-quoted strings
+            rawJson = rawJson.replace(/"([^"\\]|\\.)*"/g, (m) => 
+              m.replace(/\n/g, '\\n').replace(/\r/g, '\\r')
+            );
+            // Remove trailing commas before closing braces/brackets
+            rawJson = rawJson.replace(/,(\s*[\]}])/g, '$1');
+
+            const parsed = JSON.parse(rawJson);
             if (parsed && parsed.name && parsed.args) {
               toolData = parsed;
               toolCallMatch = false; // mark as fallback so we know to hide the text
             }
-          } catch(e){}
+          } catch(e){
+            console.warn("Failed parsing repaired JSON fallback:", e);
+          }
         }
       }
 
