@@ -32,10 +32,11 @@ export async function extractPdfText(bytes) {
   // Dynamically import to respect the vite optimizeDeps.exclude rule.
   const pdfjsLib = await import('pdfjs-dist');
 
-  // Point to the local vendor worker to ensure 100% offline support.
-  pdfjsLib.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}vendor/pdfjs/pdf.worker.min.mjs`;
+  // Disable the external worker to avoid COEP/COOP issues in cross-origin isolated contexts.
+  // PDF parsing runs directly on the main thread instead (acceptable for indexing).
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
 
-  const loadingTask = pdfjsLib.getDocument({ data: bytes });
+  const loadingTask = pdfjsLib.getDocument({ data: bytes, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true });
   const pdf = await loadingTask.promise;
 
   let fullText = '';

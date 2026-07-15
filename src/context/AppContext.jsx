@@ -428,7 +428,7 @@ button {
         const filename = filePath.split('/').pop();
         setRagStatus(`Indexing ${filename} for RAG...`);
         try {
-          const bytes = await fileSystemAPI.readFileBinary(`workspace/${filePath}`);
+          const bytes = await fileSystemAPI.readFileBinary(filePath);
           const result = await indexDocument(bytes, filename, (progress) => {
             if (progress.status === 'progress' || progress.status === 'downloading') {
               setRagStatus(`Downloading semantic model: ${progress.name}...`);
@@ -544,9 +544,9 @@ import pandas as pd
 import json
 def preview_excel():
     try:
-        df = pd.read_excel("${filename}", nrows=5)
+        df = pd.read_excel("${filePath}", nrows=5)
         schema = {str(col): str(dtype) for col, dtype in df.dtypes.items()}
-        preview = df.head(2).to_dict(orient='records')
+        preview = df.head(2).astype(str).to_dict(orient='records')
         return json.dumps({"schema": schema, "preview_rows": preview}, indent=2)
     except Exception as e:
         return f"[Excel Context Extraction Failed: {str(e)}]"
