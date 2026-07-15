@@ -9,6 +9,8 @@
  */
 
 import mammoth from 'mammoth';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import * as pdfWorkerModule from 'pdfjs-dist/build/pdf.worker.mjs';
 
 // ─── Text Extraction ──────────────────────────────────────────────────────────
 
@@ -29,24 +31,57 @@ export async function extractDocxText(bytes) {
  * @returns {Promise<string>} Extracted plain text
  */
 export async function extractPdfText(bytes) {
-  // Dynamically import to respect the vite optimizeDeps.exclude rule.
   const pdfjsLib = await import('pdfjs-dist');
 
-  // Disable the external worker to avoid COEP/COOP issues in cross-origin isolated contexts.
-  // PDF parsing runs directly on the main thread instead (acceptable for indexing).
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+  // Always ensure GlobalWorkerOptions.workerSrc is populated with a valid URL before calling getDocument
+  const resolvedWorkerSrc = pdfWorkerUrl || `${import.meta.env.BASE_URL}vendor/pdfjs/pdf.worker.min.mjs`;
+  pdfjsLib.GlobalWorkerOptions.workerSrc = resolvedWorkerSrc;
 
-  const loadingTask = pdfjsLib.getDocument({ data: bytes, useWorkerFetch: false, isEvalSupported: false, useSystemFonts: true });
-  const pdf = await loadingTask.promise;
-
-  let fullText = '';
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const textContent = await page.getTextContent();
-    const pageText = textContent.items.map(item => item.str).join(' ');
-    fullText += pageText + '\n';
+  // Pre-populate globalThis.pdfjsWorker so pdf.js can instantly utilize the in-memory WorkerMessageHandler
+  // without spawning external Workers or throwing cross-origin/COEP exceptions.
+  if (pdfWorkerModule && pdfWorkerModule.WorkerMessageHandler) {
+    globalThis.pdfjsWorker = pdfWorkerModule;
   }
-  return fullText;
+
+  try {
+    const loadingTask = pdfjsLib.getDocument({ 
+      data: bytes, 
+      useWorkerFetch: false, 
+      isEvalSupported: false, 
+      useSystemFonts: true 
+    });
+    const pdf = await loadingTask.promise;
+
+    let fullText = '';
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map(item => item.str).join(' ');
+      fullText += pageText + '\n';
+    }
+    return fullText;
+  } catch (err) {
+    console.warn("Standard getDocument failed, retrying with explicit fallback options:", err);
+    pdfjsLib.GlobalWorkerOptions.workerSrc = resolvedWorkerSrc;
+    const loadingTask = pdfjsLib.getDocument({ 
+      data: bytes, 
+      disableAutoFetch: true,
+      disableStream: true,
+      useWorkerFetch: false, 
+      isEvalSupported: false, 
+      useSystemFonts: true 
+    });
+    const pdf = await loadingTask.promise;
+
+    let fullText = '';
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items.map(item => item.str).join(' ');
+      fullText += pageText + '\n';
+    }
+    return fullText;
+  }
 }
 
 // ─── Chunking ─────────────────────────────────────────────────────────────────

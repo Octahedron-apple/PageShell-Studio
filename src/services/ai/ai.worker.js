@@ -72,6 +72,17 @@ async function getFallbackGenerator() {
 self.onmessage = async (e) => {
   const { action, prompt, tools, stream = true, requestId } = e.data;
 
+  if (action === 'INTERRUPT') {
+    if (engine && typeof engine.interruptGenerate === 'function') {
+      try {
+        engine.interruptGenerate();
+      } catch (err) {
+        console.warn("Could not interrupt WebLLM engine:", err);
+      }
+    }
+    return;
+  }
+
   if (action === 'GENERATE') {
     try {
       const messages = Array.isArray(prompt) ? prompt : [

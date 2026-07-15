@@ -76,3 +76,15 @@ let statusSubscriber = null;
 export function subscribeAIStatus(callback) {
   statusSubscriber = callback;
 }
+
+export function stopGeneration() {
+  if (aiWorker) {
+    aiWorker.postMessage({ action: 'INTERRUPT' });
+    for (const [id, req] of Object.entries(activeRequests)) {
+      if (req.onComplete) {
+        req.onComplete('Error: Generation stopped by user.');
+      }
+      delete activeRequests[id];
+    }
+  }
+}

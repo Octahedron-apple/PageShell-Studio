@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { subscribeAIStatus } from '../services/ai/models.js';
+import { useApp } from '../context/AppContext.jsx';
 
 export default function AIAssistant({ 
   selectedFiles, onQuery, aiLogs, onClearLogs, aiStreaming, ragStatus, ragIndices,
   chatSessions = [], currentSessionId, onLoadChat, onDeleteChat, onNewChat, customSystemPrompt, setCustomSystemPrompt,
-  confirmTool
+  confirmTool, onStop
 }) {
+  const { handleStopAgent } = useApp();
   const [query, setQuery] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [whisperStatus, setWhisperStatus] = useState('');
@@ -308,9 +310,21 @@ export default function AIAssistant({
           disabled={aiStreaming}
           id="ai-query-input"
         />
-        <button type="submit" className="bg-[var(--accent-primary)] bg-[image:var(--accent-gradient)] text-white border-none rounded-md px-4 py-2 text-[13px] font-bold cursor-pointer outline-none transition-opacity duration-200 hover:opacity-90" id="ai-send-btn" disabled={aiStreaming}>
-          {aiStreaming ? 'Working...' : 'Ask'}
-        </button>
+        {aiStreaming ? (
+          <button 
+            type="button" 
+            onClick={() => (onStop || handleStopAgent)?.()} 
+            className="bg-red-600 hover:bg-red-700 text-white border-none rounded-md px-4 py-2 text-[13px] font-bold cursor-pointer outline-none transition-colors duration-200 flex items-center gap-1 shrink-0" 
+            title="Stop generating response"
+            id="ai-stop-btn"
+          >
+            ⏹ Stop
+          </button>
+        ) : (
+          <button type="submit" className="bg-[var(--accent-primary)] bg-[image:var(--accent-gradient)] text-white border-none rounded-md px-4 py-2 text-[13px] font-bold cursor-pointer outline-none transition-opacity duration-200 hover:opacity-90" id="ai-send-btn">
+            Ask
+          </button>
+        )}
       </form>
       </>)}
     </div>

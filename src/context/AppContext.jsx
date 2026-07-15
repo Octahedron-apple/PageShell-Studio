@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { fileSystemAPI } from '../services/fs/fileSystem.js';
 import { runPython, subscribePythonLogs, terminateWorker as terminatePythonWorker } from '../services/runtimes/pyodide.js';
 import { runJS, terminateWorker as terminateJSWorker } from '../services/runtimes/quickjs.js';
-import { generateCode } from '../services/ai/models.js';
+import { generateCode, stopGeneration } from '../services/ai/models.js';
 import { indexDocument, retrieveChunks } from '../services/ai/rag.js';
 import { exportWorkspaceToZip, importWorkspaceFromZip } from '../utils/zipUtils.js';
 import { buildGlobalIndex, updateFileInIndex, removeFileFromIndex } from '../services/fs/search.js';
@@ -261,11 +261,22 @@ button {
       setLoading(false);
     }
   };
+  const handleStopAgent = () => {
+    stopGeneration();
+    setAiStreaming(false);
+    setAiLogs(prev => [...prev, { sender: 'ai', text: '\n🛑 [Generation stopped by user]' }]);
+  };
+
   const handleStop = () => {
-    if (runTarget) {
-      if (runTarget.endsWith('.py')) {
+    stopGeneration();
+    if (aiStreaming) {
+      setAiStreaming(false);
+      setAiLogs(prev => [...prev, { sender: 'ai', text: '\n🛑 [Generation stopped by user]' }]);
+    }
+    if (runTarget || loading) {
+      if (runTarget?.endsWith('.py')) {
         terminatePythonWorker();
-      } else if (runTarget.endsWith('.js')) {
+      } else if (runTarget?.endsWith('.js')) {
         terminateJSWorker();
       }
       setLogs(prev => [...prev, { type: 'stderr', text: `\nExecution manually stopped.` }]);
@@ -276,17 +287,15 @@ button {
 
   const handleUpload = async (file) => {
     setLogs(prev => [...prev, { type: 'info', text: `Reading file ${file.name}...` }]);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        await fileSystemAPI.writeFile(`workspace/${file.name}`, new Uint8Array(event.target.result));
-        setLogs(prev => [...prev, { type: 'success', text: `Synchronized ${file.name} to OPFS workspace successfully.` }]);
-        await refreshFiles();
-      } catch (err) {
-        setLogs(prev => [...prev, { type: 'stderr', text: `Failed to write file to OPFS: ${err.message}` }]);
-      }
-    };
-    reader.readAsArrayBuffer(file);
+    try {
+      const buffer = await file.arrayBuffer();
+      await fileSystemAPI.writeFile(`workspace/${file.name}`, new Uint8Array(buffer));
+      setLogs(prev => [...prev, { type: 'success', text: `Synchronized ${file.name} to OPFS workspace successfully.` }]);
+      await refreshFiles();
+    } catch (err) {
+      setLogs(prev => [...prev, { type: 'stderr', text: `Failed to write file to OPFS: ${err.message}` }]);
+      throw err;
+    }
   };
 
   const handleExportZip = async () => {
@@ -847,7 +856,7 @@ preview_excel()
       chatSessions, currentSessionId,
       handleStartNewChat, handleLoadChat, handleDeleteChat,
       ragStatus, ragIndices, handleRun,
-      handleStop,
+      handleStop, handleStopAgent,
       handleCreateFile,
       handleUpload, handleOpenFile, handleSaveFile, handleDeleteFile,
       handleExportZip, handleImportZip,
