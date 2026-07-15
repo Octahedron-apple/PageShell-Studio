@@ -143,8 +143,8 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg-app)] text-[var(--text-primary)]">
-      <div className="flex justify-between items-center px-5 py-3 bg-[var(--bg-panel)] border-b border-[var(--border-color)]">
+    <div className="flex-1 w-full flex flex-col h-full bg-[var(--bg-app)] text-[var(--text-primary)] overflow-hidden">
+      <div className="flex justify-between items-center px-5 py-3 bg-[var(--bg-panel)] border-b border-[var(--border-color)] shrink-0">
         <div className="text-sm font-semibold">
           📄 {activeFile ? activeFile.split('/').pop() : 'No file selected'}
         </div>
@@ -156,7 +156,7 @@ export default function DocumentsPage() {
         )}
       </div>
 
-      <div className="flex-1 overflow-auto p-5" ref={viewerRef}>
+      <div className={`flex-1 overflow-auto ${fileType === 'pdf' ? 'p-0 flex flex-col w-full h-full' : 'p-5'}`} ref={viewerRef}>
         {loading ? (
           <div className="text-center text-[var(--text-muted)] mt-10 italic">Loading document...</div>
         ) : !activeFile ? (
@@ -182,7 +182,7 @@ export default function DocumentsPage() {
           <iframe 
             src={content} 
             title="PDF Viewer"
-            className="w-full h-full border-none" 
+            className="flex-1 w-full h-full min-h-[800px] border-none block" 
           />
         ) : fileType === 'text' ? (
           <pre className="m-0 whitespace-pre-wrap font-mono text-[13px]">{content}</pre>

@@ -4,7 +4,7 @@ import { fileSystemAPI } from '../services/fs/fileSystem.js';
 import { runPython, subscribePythonLogs, terminateWorker as terminatePythonWorker } from '../services/runtimes/pyodide.js';
 import { runJS, terminateWorker as terminateJSWorker } from '../services/runtimes/quickjs.js';
 import { generateCode, stopGeneration } from '../services/ai/models.js';
-import { indexDocument, retrieveChunks } from '../services/ai/rag.js';
+import { extractDocxText, extractPdfText } from '../services/ai/rag.js';
 import { exportWorkspaceToZip, importWorkspaceFromZip } from '../utils/zipUtils.js';
 import { buildGlobalIndex, updateFileInIndex, removeFileFromIndex } from '../services/fs/search.js';
 import localforage from 'localforage';
@@ -420,48 +420,7 @@ button {
     );
   };
 
-  // --- RAG Indexing ---
-  // Whenever the selected files change, extract and index any PDF or DOCX files.
-  useEffect(() => {
-    const ragExtensions = ['pdf', 'docx'];
-    const filesToIndex = selectedFiles.filter(fp => {
-      const ext = fp.toLowerCase().split('.').pop();
-      return ragExtensions.includes(ext) && !ragIndices.has(fp);
-    });
-
-    if (filesToIndex.length === 0) return;
-
-    const indexFiles = async () => {
-      const newIndices = new Map(ragIndices);
-      for (const filePath of filesToIndex) {
-        const filename = filePath.split('/').pop();
-        setRagStatus(`Indexing ${filename} for RAG...`);
-        try {
-          const bytes = await fileSystemAPI.readFileBinary(filePath);
-          const result = await indexDocument(bytes, filename, (progress) => {
-            if (progress.status === 'progress' || progress.status === 'downloading') {
-              setRagStatus(`Downloading semantic model: ${progress.name}...`);
-            } else {
-              setRagStatus(`Embedding ${filename} for RAG...`);
-            }
-          });
-          if (result) {
-            newIndices.set(filePath, result);
-            setRagStatus(`Indexed ${filename}: ${result.chunkCount} chunks`);
-          } else {
-            setRagStatus(`Could not index ${filename} (unsupported type or empty)`);
-          }
-        } catch (err) {
-          setRagStatus(`Failed to index ${filename}: ${err.message}`);
-          console.error('RAG indexing error:', err);
-        }
-      }
-      setRagIndices(newIndices);
-    };
-
-    indexFiles();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFiles]);
+  // RAG indexing disabled — selected documents are extracted directly on query.
 
   const generateCodeAsync = (messages, onToken, tools) => {
     return new Promise((resolve) => {
@@ -503,47 +462,33 @@ button {
     let contextText = '';
 
     // ── Semantic RAG Retrieval ──
-    const ragExtensions = ['pdf', 'docx'];
-    const allChunks = [];
+    // ── Direct Document Context (PDF & DOCX) ──
     for (const filePath of selectedFiles) {
-      const ext = filePath.toLowerCase().split('.').pop();
-      if (ragExtensions.includes(ext) && ragIndices.has(filePath)) {
-        const indexResult = ragIndices.get(filePath);
-        if (indexResult.chunks) {
-          allChunks.push(...indexResult.chunks);
-        }
-      }
-    }
-
-    let ragResults = [];
-    if (allChunks.length > 0) {
-      setRagStatus(`Searching documents semantically...`);
       try {
-        ragResults = await retrieveChunks(allChunks, queryText, 5);
-      } catch (e) {
-        console.error("Semantic search error:", e);
+        const filename = filePath.split('/').pop();
+        const ext = filename.toLowerCase().split('.').pop();
+        if (ext === 'pdf') {
+          setLogs(prev => [...prev, { type: 'info', text: `Extracting text from ${filename}...` }]);
+          const bytes = await fileSystemAPI.readFileBinary(filePath);
+          const text = await extractPdfText(bytes);
+          contextText += `\n--- Content of ${filename} (PDF) ---\n${text.slice(0, 15000)}\n\n`;
+        } else if (ext === 'docx') {
+          setLogs(prev => [...prev, { type: 'info', text: `Extracting text from ${filename}...` }]);
+          const bytes = await fileSystemAPI.readFileBinary(filePath);
+          const text = await extractDocxText(bytes);
+          contextText += `\n--- Content of ${filename} (DOCX) ---\n${text.slice(0, 15000)}\n\n`;
+        }
+      } catch (err) {
+        console.error(`Failed extracting context from ${filePath}:`, err);
       }
-      
-      if (ragResults.length === 0 && allChunks.length > 0) {
-        ragResults.push({ text: allChunks[0].text, source: allChunks[0].source });
-      }
-      
-      setRagStatus('');
-    }
-    if (ragResults.length > 0) {
-      contextText += '--- Relevant excerpts retrieved via RAG ---\n';
-      ragResults.forEach((chunk, i) => {
-        contextText += `[${i + 1}] (from ${chunk.source}):\n${chunk.text}\n\n`;
-      });
     }
 
-    // ── Direct Context (non-RAG files) ──
+    // ── Direct Context (Excel & other files) ──
     for (const filePath of selectedFiles) {
       try {
         const filename = filePath.split('/').pop();
         const ext = filename.toLowerCase().split('.').pop();
 
-        // Skip PDF/DOCX files — their content is handled by RAG above
         if (['pdf', 'docx'].includes(ext)) continue;
 
         if (['xlsx', 'xls'].includes(ext)) {
