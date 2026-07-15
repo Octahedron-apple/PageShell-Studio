@@ -687,13 +687,13 @@ preview_excel()
         }
         
         currentMessages.push({ role: 'assistant', content: fullOutput });
-        currentMessages.push({ role: 'system', content: `<tool_response>\n${result}\n</tool_response>` });
+        currentMessages.push({ role: 'user', content: `<tool_response>\n${result}\n</tool_response>` });
         
         setAiLogs(prev => {
           const next = [...prev];
           const last = next[next.length - 1];
           if (last?.sender === 'ai') {
-            let cleaned = last.text.trim();
+            let cleaned = (last.text || '').trim();
             if (!toolCallMatch && cleaned.startsWith('{') && cleaned.endsWith('}')) {
               cleaned = '';
             }
