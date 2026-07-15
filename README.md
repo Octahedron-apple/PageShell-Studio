@@ -1,158 +1,227 @@
-<p align="center">
-  <img src="public/assets/logo.png" alt="PageShell Studio Logo" width="180" />
-</p>
+# 🐚 PageShell Studio
 
-<h1 align="center">PageShell Studio</h1>
+> **A fully offline, browser-native AI coding & data assistant** — runs entirely on your device with no backend server, no cloud API calls, and zero data leaving your machine (except optional voice input).
 
-<p align="center">
-  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
-  <img src="https://img.shields.io/badge/version-v0.1.0-blue" alt="version" />
-  <img src="https://img.shields.io/badge/build-passing-brightgreen" alt="Build Status" />
-</p>
+---
 
-## Short Description
-PageShell Studio is a powerful, **fully offline web development environment** and **code execution sandbox** running entirely within your browser. Built for OSDHack 2026, it leverages **WebAssembly**, **WebGPU**, and **OPFS** technologies to deliver a desktop-grade IDE experience without requiring a backend server.
+## 🎥 Demo Video
 
-## Live Demo
-PageShell Studio is deployed online and can be accessed directly at: [https://octahedron-apple.github.io/PageShell-Studio/](https://octahedron-apple.github.io/PageShell-Studio/)
+> _Demo video coming soon — 2–3 minutes showing the problem, the solution, and on-device AI working live._
 
-## Problem Statement
-Cloud-based IDEs and AI tools compromise privacy by sending your code to external servers and require constant internet connectivity. While local AI solutions (like **Ollama**) solve this, they present a massive barrier to entry. Installing bare-metal models, configuring Python environments, and setting up complex RAG pipelines requires significant technical expertise, leaving these powerful tools out of reach for the average user.
+---
 
-## Solution Overview
-PageShell Studio solves this by moving the entire development lifecycle directly into the client's web browser, instantly democratizing access to local AI. There are no installations, no terminal configurations, and no backend servers required.
+## ✨ Features
 
-- **100% Offline & Serverless**: Everything runs securely in the browser with zero latency and no external API calls.
-- **Multi-Language Sandbox**: 
-  - Execute Python scripts using **Pyodide** (with preloaded offline data science wheels like **numpy**, **pandas**, **openpyxl**).
-  - Execute JavaScript code securely using **QuickJS** sandboxing.
-- **Live Web Preview**: Write HTML, CSS, and JS in the editor and launch a live preview of your web app instantly.
-- **Origin Private File System (OPFS)**: True file system access in the browser. Drag and drop local files into the workspace, read/write binaries natively from Python, and persist state across sessions.
-- **Premium UI/UX**: Features a modern, sleek interface with a dynamic Light/Dark mode toggle driven by custom CSS variables.
+- **On-Device AI Assistant** — Powered by [WebLLM](https://github.com/mlc-ai/web-llm) (WebGPU) with automatic CPU/WASM fallback via [Transformers.js](https://github.com/xenova/transformers.js)
+- **Python Sandbox** — Full CPython 3.12 runtime via [Pyodide](https://pyodide.org) with `numpy`, `pandas`, `openpyxl`, `xlrd` preloaded offline
+- **JavaScript Sandbox** — Isolated QuickJS WASM runtime via [quickjs-emscripten](https://github.com/justjake/quickjs-emscripten)
+- **Code Editor** — Syntax-highlighted editor (CodeMirror 6) with AI autocomplete for Python, JS, HTML, CSS
+- **Document Viewer** — Read and export PDF, DOCX, XLSX, CSV files; all parsing is on-device
+- **AI Tool Calling** — The AI can `write_files`, `edit_file`, and `run_python` autonomously with user confirmation
+- **OPFS Workspace** — Persistent file system using the browser's Origin Private File System
+- **Speech-to-Text** — Optional voice input via Whisper.cpp (requires internet for model download on first use only)
+- **Global Search** — Full-text search across all workspace files using MiniSearch
+- **Import / Export** — ZIP-based workspace backup and restore
+- **Installable PWA** — Install directly from your browser to desktop or mobile home screen
 
-## Screenshots
-### Home Dashboard
-![PageShell Studio Home](docs/assets/pageshell-home.png)
+---
 
-### Code Editor
-![PageShell Studio Code Editor](docs/assets/pageshell-code-editor.png)
-
-### Smart Sort
-![PageShell Studio Smart Sort](docs/assets/pageshell-smart-sort.png)
-
-### Local AI Assistant
-![PageShell Studio AI Assistant](docs/assets/pageshell-ai-assistant.png)
-
-### Live Web Preview
-![PageShell Studio Web Preview](docs/assets/pageshell-web-preview.png)
-
-## On Device AI Explanation
-Our platform pushes the boundaries of edge computing by running all AI models locally on the user's device via **WebAssembly** and **WebGPU**:
-
-- **WebGPU Code Assistant**: Integrated with **WebLLM** running `Qwen2.5-Coder-1.5B-Instruct` directly on your local GPU. It provides real-time AI code autocompletion and conversational assistance without sending your code to a cloud server.
-- **Semantic Search RAG**: Chat with your PDFs and DOCX files. Powered by **Transformers.js** (`Xenova/all-MiniLM-L6-v2`), the app generates dense vector embeddings in a background worker to provide lightning-fast, highly accurate contextual retrieval using **Cosine Similarity**.
-- **Speech-to-Text**: Fast audio transcription directly into the AI chat window using the native **Browser Web Speech API**, requiring zero model downloads.
-
-## Tech Stack
-- **Framework**: React 18 & Vite
-- **Styling**: Tailwind CSS v4 + Vanilla CSS Variables for theming
-- **Editor**: CodeMirror 6
-- **Local AI & ML**: `@mlc-ai/web-llm`, `@xenova/transformers`
-- **Virtual Environments**: `pyodide` (Python), `quickjs-emscripten` (JavaScript)
-- **Document Parsing**: `mammoth` (DOCX), `pdfjs-dist` (PDF), `xlsx` (Excel)
-
-## Setup Instructions
+## 🚀 Setup & Run
 
 ### Prerequisites
-- Node.js (v18+)
-- A modern Chromium-based desktop browser with WebGPU enabled (Chrome 113+ or Edge 113+).
 
-> [!NOTE]  
-> Mobile browsers and Firefox/Safari have limited or no WebGPU support. A desktop Chromium browser is strictly recommended to run the AI and WebAssembly features smoothly.
+| Requirement | Version |
+|---|---|
+| Node.js | ≥ 18 |
+| npm | ≥ 9 |
+| Browser | Chrome 113+ or Edge 113+ (WebGPU support recommended) |
 
-### Installation
-1. Clone the repository:
+### 1. Clone the repository
+
 ```bash
 git clone https://github.com/Octahedron-apple/PageShell-Studio.git
 cd PageShell-Studio
 ```
 
-2. Install dependencies:
+### 2. Install dependencies
+
 ```bash
 npm install
 ```
 
-3. Start the development server:
+### 3. (Optional) Download offline Python wheels
+
+The offline Python packages (`numpy`, `pandas`, etc.) are pre-bundled in `public/vendor/pyodide/`. If you need to refresh them, run:
+
+```bash
+python scripts/download_wheels.py
+```
+
+### 4. Run the dev server
+
 ```bash
 npm run dev
 ```
 
-**Architecture Note**:
-Read the full architecture and sandboxing overview here: [ARCHITECTURE.md](./ARCHITECTURE.md)
+Open `http://localhost:5173/PageShell-Studio/` in Chrome or Edge.
 
-### System Architecture
-```mermaid
-graph TD
-    subgraph UI["React Main Thread"]
-        Editor["Code Editor"]
-        FM["File Manager"]
-        Chat["AI Chat"]
-    end
+> **Note:** The dev server injects `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp` headers required by `SharedArrayBuffer` (used by Pyodide and WebLLM). Do not use a plain static file server.
 
-    subgraph Workers["Web Workers"]
-        Py["Pyodide Sandbox"]
-        JS["QuickJS Sandbox"]
-        RAG["Transformers.js"]
-        WebSpeech["Web Speech API"]
-    end
+### 5. Build for production (GitHub Pages)
 
-    subgraph Storage["Browser Storage"]
-        OPFS[("Origin Private File System")]
-        IDB[("IndexedDB Model Cache")]
-    end
-
-    Editor <-->|"eval()"| Py
-    Editor <-->|"eval()"| JS
-    FM <-->|"SyncAccessHandle"| OPFS
-    Py <-->|"Native File API"| OPFS
-    Chat <-->|"WebGPU"| WebLLM["WebLLM (Local GPU)"]
-    Chat <-->|"Audio"| WebSpeech
-    Chat <-->|"Semantic Search"| RAG
-    RAG <-->|"Fetch Vectors"| OPFS
-    WebLLM <-->|"Weights"| IDB
+```bash
+npm run build
 ```
 
-## Usage Instructions
-1. Open your browser and navigate to the local server URL provided by Vite. Use `localhost` or HTTPS, as WebGPU and OPFS require secure contexts.
-2. Drag and drop your project files (or Zip archives) into the File Manager.
-3. Open the **Code Editor** to write your scripts, or the **Documents Viewer** to read PDFs and DOCX files.
-4. Select files using the checkboxes in the File Manager to attach them as context for the **AI Assistant**.
-5. Switch to the **Run** tab to execute Python/JavaScript code natively in the browser.
+Output goes to `dist/`. The live deployment is at **https://octahedron-apple.github.io/PageShell-Studio/**.
 
-### 🧪 Quick Testing with Sample Files
-To reduce friction and allow you to test our offline Data Analysis and RAG capabilities instantly, PageShell Studio automatically pre-loads **three sample files** into your workspace on first boot:
-- **`sample_code.py`**: Open this in the Code tab and hit Run to test our offline Python/Pyodide execution environment.
-- **`financial_data.xlsx`**: A sample spreadsheet. Check its box in the File Manager, open the AI Assistant, and ask questions like *"What was the Net Profit for Q4?"* to test our local spreadsheet parsing and context injection.
-- **`company_policy.docx`**: A sample corporate document. Open it in the Documents Viewer or ask the AI *"What is the remote work policy?"* to test our local text extraction, WASM vector embeddings, and Semantic Search RAG pipeline powered by Cosine Similarity.
+---
 
-## Challenges We Faced
+## 📲 Install as a Web App (PWA)
 
-Building a fully local IDE presented significant technical hurdles:
-- **Cross-Origin Isolation & SharedArrayBuffers**: WebGPU and fast WebAssembly require \`SharedArrayBuffer\`, which mandates strict COOP/COEP headers. This broke standard cross-origin asset fetching, forcing us to meticulously manage CORS headers and local proxying for massive AI model weights.
-- **Sandboxing & Memory Leaks**: Running untrusted JavaScript via \`quickjs-emscripten\` required manual C-style memory management. Without explicit \`.dispose()\` calls on returned handles, the WASM linear memory would exhaust and silently crash the browser tab within seconds.
-- **Pyodide & The OPFS Bridge**: Pyodide operates in its own virtual MEMFS. To allow Python scripts to natively read the user's files without manual byte-conversion overhead, we successfully mounted the native OPFS browser directory handle directly onto the \`/workspace\` virtual volume inside the Pyodide Web Worker.
+PageShell Studio is a Progressive Web App and can be installed directly to your desktop or Android home screen for a native-app experience — no app store required.
 
-## Known Limitations or Future Scope
+### Desktop (Chrome / Edge)
+1. Open the site in Chrome or Edge
+2. Click the **install icon** (⊕) in the address bar (right side)
+3. Click **Install** in the prompt
+4. PageShell Studio opens in its own window, offline-capable after first load
 
-### Known Limitations
-- **File Size**: Storing massive files or hundreds of documents in the OPFS workspace may be subject to browser storage quotas, and initial model downloads for AI require significant bandwidth (up to ~900MB).
-- **Performance Overhead**: There is a slight speed reduction when running models through WebGPU in the browser compared to running them on bare-metal through native engines like Ollama. This is due to browser sandboxing and translation overhead.
-- **Cache Volatility**: Because all data is stored entirely locally in the browser, if a user completely clears their site data/cache, all workspace files and downloaded WebGPU models will be lost.
+### Android
+1. Open the site in Chrome
+2. Tap the browser menu **⋮** → **Add to Home screen**
+3. Confirm — the app icon appears on your home screen
 
-### Future Scope
-- **Electron Port**: Wrapping the application in Electron to provide a native desktop experience with direct file system access, bypassing browser storage limits.
-- **Automation Capabilities**: Advanced scripting and macro workflows for browser-based task automation.
-- **Better AI Tooling**: Enhanced AI integrations, larger models, and improved prompt orchestration for more complex reasoning.
+### iOS (Safari)
+1. Open the site in Safari
+2. Tap the **Share** button → **Add to Home Screen**
+3. Confirm — the app icon appears on your home screen
 
-## License Information
-Created for OSDHack 2026.
+> **Note:** Full offline capability (no internet at all) requires the AI model to have been downloaded at least once on that device.
+
+---
+
+## 🧪 Sample Inputs & Expected Outputs
+
+### Python Execution
+
+**Input (via Run tab or AI):**
+```python
+import pandas as pd
+df = pd.DataFrame({'x': [1,2,3], 'y': [4,5,6]})
+print(df.describe())
+```
+
+**Expected Output (Terminal):**
+```
+         x    y
+count  3.0  3.0
+mean   2.0  5.0
+std    1.0  1.0
+min    1.0  4.0
+...
+```
+
+### AI Tool Call — Write File
+
+**User message:** `"Write a hello world Python script"`
+
+**AI invokes:**
+```json
+{"name": "write_files", "args": {"files": [{"path": "hello.py", "content": "print('Hello, World!')"}]}}
+```
+
+**Result:** `hello.py` appears in the OPFS workspace file tree.
+
+### AI Tool Call — Edit File
+
+**User message:** `"Change the print statement to say 'Hello, PageShell!'"`
+
+**AI invokes:**
+```json
+{
+  "name": "edit_file",
+  "args": {
+    "path": "hello.py",
+    "old_content": "print('Hello, World!')",
+    "new_content": "print('Hello, PageShell!')"
+  }
+}
+```
+
+### Document Ingestion
+
+1. Go to **FS tab** → drag & drop a `.xlsx`, `.pdf`, or `.docx` file
+2. Select the file as AI context (checkbox in file tree)
+3. Ask the AI: `"Summarize the contents of this document"`
+
+---
+
+## 📁 Project Structure
+
+```
+PageShell-Studio/
+├── public/
+│   ├── assets/             # App icons and static images
+│   ├── vendor/
+│   │   ├── pyodide/        # Offline Pyodide runtime + .whl packages
+│   │   ├── whisper/        # Whisper.cpp WASM binary
+│   │   ├── quickjs/        # QuickJS WASM binary
+│   │   └── onnx/           # ONNX runtime (embeddings)
+│   ├── manifest.webmanifest  # PWA manifest
+│   └── coi-serviceworker.js  # Cross-Origin Isolation + PWA install SW
+├── scripts/
+│   └── download_wheels.py  # Helper to refresh offline Python packages
+├── src/
+│   ├── components/         # React UI components
+│   ├── context/
+│   │   └── AppContext.jsx  # Global state, AI orchestration, tool calling
+│   ├── pages/              # Route-level page components
+│   └── services/
+│       ├── ai/             # WebLLM worker, RAG, embeddings
+│       ├── fs/             # OPFS file system broker, search index
+│       └── runtimes/       # Pyodide and QuickJS worker bridges
+├── ARCHITECTURE.md
+├── TECHNICAL_REPORT.md
+├── vite.config.js
+└── package.json
+```
+
+---
+
+## 🌐 Internet Requirements
+
+| Feature | Requires Internet? |
+|---|---|
+| AI chat & code generation | ❌ No — model cached locally after first load |
+| Python execution | ❌ No — Pyodide + wheels bundled in `/public/vendor/` |
+| JavaScript execution | ❌ No — QuickJS WASM bundled locally |
+| Document parsing (PDF/DOCX/XLSX) | ❌ No — all client-side |
+| File search | ❌ No — MiniSearch runs in-browser |
+| **Voice / Speech-to-Text** | ⚠️ **Yes — Whisper model download on first use only** |
+| WebLLM model (first load) | ⚠️ **Yes — one-time download (~1 GB), then cached in IndexedDB** |
+
+---
+
+## 🛠️ Key Dependencies
+
+| Package | Purpose |
+|---|---|
+| `@mlc-ai/web-llm` | WebGPU-accelerated on-device LLM inference |
+| `@xenova/transformers` | CPU/WASM fallback LLM inference |
+| `pyodide` | CPython 3.12 in WebAssembly |
+| `quickjs-emscripten` | Sandboxed JavaScript execution (QuickJS WASM) |
+| `pdfjs-dist` | Client-side PDF text extraction |
+| `mammoth` | Client-side DOCX text extraction |
+| `xlsx` | Client-side Excel/CSV parsing |
+| `minisearch` | Full-text file search index |
+| `codemirror` | Code editor with syntax highlighting |
+| `jszip` | Workspace ZIP import/export |
+| `localforage` | Persistent settings via IndexedDB |
+| `react-resizable-panels` | Flexible panel layout |
+
+---
+
+## 📜 License
+
+MIT © Bhavya Singh

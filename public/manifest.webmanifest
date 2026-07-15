@@ -1,0 +1,22 @@
+{
+  "name": "PageShell Studio",
+  "short_name": "PageShell",
+  "description": "A fully offline, browser-native AI coding & data assistant. Runs entirely on your device.",
+  "start_url": "/PageShell-Studio/",
+  "scope": "/PageShell-Studio/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1117",
+  "theme_color": "#0f1117",
+  "categories": ["developer", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "assets/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "prefer_related_applications": false
+}
