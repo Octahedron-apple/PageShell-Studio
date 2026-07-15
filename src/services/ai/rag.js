@@ -9,6 +9,7 @@
  */
 
 import mammoth from 'mammoth';
+import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as pdfWorkerModule from 'pdfjs-dist/build/pdf.worker.mjs';
 
@@ -31,8 +32,6 @@ export async function extractDocxText(bytes) {
  * @returns {Promise<string>} Extracted plain text
  */
 export async function extractPdfText(bytes) {
-  const pdfjsLib = await import('pdfjs-dist');
-
   // Always ensure GlobalWorkerOptions.workerSrc is populated with a valid URL before calling getDocument
   const resolvedWorkerSrc = pdfWorkerUrl || `${import.meta.env.BASE_URL}vendor/pdfjs/pdf.worker.min.mjs`;
   pdfjsLib.GlobalWorkerOptions.workerSrc = resolvedWorkerSrc;
