@@ -132,7 +132,7 @@ export function AppProvider({ children }) {
   const [aiStreaming, setAiStreaming] = useState(false);
 
   const [customSystemPrompt, setCustomSystemPrompt] = useState(() => {
-    return localStorage.getItem('pageshell_system_prompt') || 'You are an offline coding assistant. Here is the relevant file context:';
+    return localStorage.getItem('pageshell_system_prompt') || 'You are PageShell, an expert offline coding assistant running entirely in the browser. Be helpful, concise, and conversational. When answering questions, always reply in plain, readable text. NEVER output raw JSON objects or tool call syntax in your response text — tool calls are handled separately and invisibly. Only invoke a tool when the user has clearly and explicitly asked you to create a file or run code.';
   });
 
   useEffect(() => {
@@ -428,7 +428,7 @@ button {
         const filename = filePath.split('/').pop();
         setRagStatus(`Indexing ${filename} for RAG...`);
         try {
-          const bytes = await fileSystemAPI.readFileBinary(filePath);
+          const bytes = await fileSystemAPI.readFileBinary(`workspace/${filePath}`);
           const result = await indexDocument(bytes, filename, (progress) => {
             if (progress.status === 'progress' || progress.status === 'downloading') {
               setRagStatus(`Downloading semantic model: ${progress.name}...`);
@@ -640,26 +640,28 @@ preview_excel()
           console.error("Failed to parse native tool arguments:", e);
         }
       } else if (typeof fullOutput === 'string') {
-        // Fallback string extraction if model returns raw JSON text
+        // Fallback string extraction if model outputs raw JSON text instead of native tool_calls
         const jsonMatch = fullOutput.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           try {
             const parsed = JSON.parse(jsonMatch[0]);
             if (parsed && parsed.name && parsed.args) {
               toolData = parsed;
-              toolCallMatch = true;
+              toolCallMatch = false; // mark as fallback so we know to hide the text
             }
           } catch(e){}
         }
       }
 
       if (toolData) {
-        // Immediately erase any raw tool-call text that was streamed into the chat
+        // Always erase the last streamed AI message — it either contains raw JSON (fallback)
+        // or was empty (native tool_calls). Neither should be shown to the user.
         setAiLogs(prev => {
           const next = [...prev];
           const last = next[next.length - 1];
-          if (last?.sender === 'ai') {
-            next[next.length - 1] = { ...last, text: '' };
+          if (last?.sender === 'ai' && !last.pendingTool) {
+            // Remove the empty/JSON entry entirely so there's no blank bubble
+            return next.slice(0, next.length - 1);
           }
           return next;
         });
