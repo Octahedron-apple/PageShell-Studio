@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext.jsx';
 
 export default function HomePage() {
   const navigate = useNavigate();
-  const { handleQuery, handleUpload, handleToggleFileSelect, setCustomSystemPrompt, selectedFiles } = useApp();
+  const { handleQuery, handleUpload, handleToggleFileSelect, setCustomSystemPrompt, selectedFiles, handleOpenFile } = useApp();
   const fileInputRef = useRef(null);
 
   const onStartProject = () => {
@@ -21,8 +21,7 @@ export default function HomePage() {
     if (!selectedFiles.includes(filePath)) {
       handleToggleFileSelect(filePath);
     }
-    navigate('/chat');
-    handleQuery(`I just uploaded ${file.name}. Please analyze it and tell me what you see.`);
+    handleOpenFile(filePath);
   };
 
   const handleDragOver = (e) => {
@@ -40,8 +39,7 @@ export default function HomePage() {
       if (!selectedFiles.includes(filePath)) {
         handleToggleFileSelect(filePath);
       }
-      navigate('/chat');
-      handleQuery(`I just dropped ${file.name}. Please analyze it.`);
+      handleOpenFile(filePath);
     }
   };
 

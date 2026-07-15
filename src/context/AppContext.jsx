@@ -461,7 +461,16 @@ button {
 
     let contextText = '';
 
-    // ── Semantic RAG Retrieval ──
+    const truncateForContext = (text, maxChars = 4000) => {
+      if (!text || typeof text !== 'string' || text.length <= maxChars) return text;
+      const half = Math.floor(maxChars / 2);
+      const firstPart = text.slice(0, half);
+      const lastPart = text.slice(-half);
+      return `${firstPart}\n... [middle portion omitted: only first and last tokens included to fit context window] ...\n${lastPart}`;
+    };
+
+    const perFileMaxChars = Math.max(1000, Math.min(4000, Math.floor(4800 / Math.max(1, selectedFiles.length))));
+
     // ── Direct Document Context (PDF & DOCX) ──
     for (const filePath of selectedFiles) {
       try {
@@ -471,12 +480,12 @@ button {
           setLogs(prev => [...prev, { type: 'info', text: `Extracting text from ${filename}...` }]);
           const bytes = await fileSystemAPI.readFileBinary(filePath);
           const text = await extractPdfText(bytes);
-          contextText += `\n--- Content of ${filename} (PDF) ---\n${text.slice(0, 15000)}\n\n`;
+          contextText += `\n--- Content of ${filename} (PDF) ---\n${truncateForContext(text, perFileMaxChars)}\n\n`;
         } else if (ext === 'docx') {
           setLogs(prev => [...prev, { type: 'info', text: `Extracting text from ${filename}...` }]);
           const bytes = await fileSystemAPI.readFileBinary(filePath);
           const text = await extractDocxText(bytes);
-          contextText += `\n--- Content of ${filename} (DOCX) ---\n${text.slice(0, 15000)}\n\n`;
+          contextText += `\n--- Content of ${filename} (DOCX) ---\n${truncateForContext(text, perFileMaxChars)}\n\n`;
         }
       } catch (err) {
         console.error(`Failed extracting context from ${filePath}:`, err);
@@ -508,14 +517,13 @@ preview_excel()
           `;
           try {
             const result = await runPython(pythonCode);
-            contextText += `--- File: ${filename} (Excel Schema Snapshot) ---\n${result}\n\n`;
+            contextText += `--- File: ${filename} (Excel Schema Snapshot) ---\n${truncateForContext(result, perFileMaxChars)}\n\n`;
           } catch (pyErr) {
             contextText += `--- File: ${filename} ---\n[Excel extraction failed: ${pyErr.message}]\n\n`;
           }
         } else {
           const content = await fileSystemAPI.readFile(`workspace/${filename}`);
-          const sliced = content.length > 1500 ? content.slice(-1500) : content;
-          contextText += `--- File: ${filename} ---\n${sliced}\n\n`;
+          contextText += `--- File: ${filename} ---\n${truncateForContext(content, perFileMaxChars)}\n\n`;
         }
       } catch (err) {
         contextText += `--- File: ${filePath.split('/').pop()} ---\n[Context Extraction Failed: ${err.message}]\n\n`;
@@ -555,7 +563,10 @@ preview_excel()
     const historyMessages = aiLogs
       .filter(log => log.sender === 'user' || log.sender === 'ai')
       .map(log => ({ role: log.sender === 'user' ? 'user' : 'assistant', content: log.text }));
-    const cappedHistory = historyMessages.slice(-6);
+    const cappedHistory = historyMessages.slice(-4).map(msg => ({
+      ...msg,
+      content: truncateForContext(msg.content, 1200)
+    }));
     const requestMessages = [
       { role: 'system', content: systemPrompt },
       ...cappedHistory,
