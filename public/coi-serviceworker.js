@@ -22,18 +22,22 @@ if (typeof window === 'undefined') {
         // Skip the "only-if-cached but not same-origin" case that causes errors
         if (req.cache === 'only-if-cached' && req.mode !== 'same-origin') return;
 
-        // Skip empty URLs and non-http(s) schemes
+        // Skip empty URLs
         if (!req.url || req.url === '') return;
 
-        // Only intercept same-origin requests.
-        // Cross-origin fetches (CDN assets, HuggingFace, etc.) pass through unmodified
-        // so we never trip over missing CORP headers on third-party servers.
         let url;
         try {
             url = new URL(req.url);
         } catch (_) {
             return;
         }
+        
+        // Skip non-http(s) schemes like blob: or data: which cause fetch() to throw in SW
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
+        // Only intercept same-origin requests.
+        // Cross-origin fetches (CDN assets, HuggingFace, etc.) pass through unmodified
+        // so we never trip over missing CORP headers on third-party servers.
         if (url.origin !== self.location.origin) return;
 
         event.respondWith(
