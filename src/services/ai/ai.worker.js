@@ -91,10 +91,7 @@ self.onmessage = async (e) => {
       ];
 
       if (tools && tools.length > 0) {
-        // Inject tool schema into the system prompt.
-        // IMPORTANT: instruct the model to ONLY use tools when explicitly asked,
-        // never proactively. Regular conversation should never trigger a tool call.
-        const toolsPrompt = `\n\nYou have access to the following tools, but ONLY use them when the user explicitly asks you to create files or run code. For all other questions, answer conversationally with plain text.\n\nAvailable tools:\n${JSON.stringify(tools, null, 2)}\n\nTo invoke a tool, output ONLY a valid JSON object with "name" and "args" keys and nothing else. Do NOT use a tool unless the user's message clearly and directly requests file creation or code execution.`;
+        const toolsPrompt = `\n\nYou have access to tools. When the user asks you to create, write, or run code/files, you MUST invoke a tool. Do NOT describe what you would do — actually do it by outputting a tool call.\n\nTo invoke a tool, output a raw JSON object (no markdown, no prose around it) in exactly this format:\n{"name": "<tool_name>", "args": {<tool_args>}}\n\nAvailable tools:\n${JSON.stringify(tools, null, 2)}\n\nIMPORTANT: Output ONLY the JSON object on its own when calling a tool. Do not wrap it in backticks or markdown. Do not explain what you are doing before or after.`;
         
         if (messages[0] && messages[0].role === 'system') {
           messages[0].content += toolsPrompt;

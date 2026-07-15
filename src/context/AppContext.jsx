@@ -170,7 +170,7 @@ export function AppProvider({ children }) {
   const [aiStreaming, setAiStreaming] = useState(false);
 
   const [customSystemPrompt, setCustomSystemPrompt] = useState(() => {
-    return localStorage.getItem('pageshell_system_prompt') || 'You are PageShell, an expert offline coding assistant running entirely in the browser. Be helpful, concise, and conversational. When answering questions, always reply in plain, readable text. NEVER output raw JSON objects or tool call syntax in your response text — tool calls are handled separately and invisibly. Only invoke a tool when the user has clearly and explicitly asked you to create a file or run code.';
+    return localStorage.getItem('pageshell_system_prompt') || 'You are PageShell, an expert offline coding assistant running entirely in the browser. Be helpful, concise, and conversational. When answering questions, reply in plain readable text. When you need to create files or run code, invoke a tool using the tool call format you have been given.';
   });
 
   useEffect(() => {
@@ -571,7 +571,7 @@ preview_excel()
     const tools = [
       {
         name: "write_files",
-        description: "Write one or multiple files to the workspace at once. Use this to generate whole projects (HTML, CSS, JS) together.",
+        description: "Write one or multiple files to the workspace at once. Use this to generate whole projects (HTML, CSS, JS) together, or to create a new file from scratch.",
         parameters: {
           files: {
             type: "array",
@@ -585,6 +585,15 @@ preview_excel()
               required: ["path", "content"]
             }
           }
+        }
+      },
+      {
+        name: "edit_file",
+        description: "Edit an existing file by replacing a specific snippet of its content. Use this to make targeted changes to a file without rewriting the whole thing.",
+        parameters: {
+          path: { type: "string", description: "Filename in the workspace, e.g. main.py" },
+          old_content: { type: "string", description: "The exact string to find and replace in the file" },
+          new_content: { type: "string", description: "The replacement string" }
         }
       },
       {
@@ -643,8 +652,11 @@ preview_excel()
           console.error("Failed to parse native tool arguments:", e);
         }
       } else if (typeof fullOutput === 'string') {
-        // Fallback string extraction if model outputs raw JSON text instead of native tool_calls
-        const jsonBlocks = extractJSONBlocks(fullOutput);
+        // Fallback string extraction if model outputs raw JSON text instead of native tool_calls.
+        // Strip markdown code fences first — models often wrap JSON in ```json ... ```
+        const stripped = fullOutput.replace(/```[a-zA-Z]*\n?([\s\S]*?)```/g, '$1');
+
+        const jsonBlocks = extractJSONBlocks(stripped);
         for (const block of jsonBlocks) {
           try {
             let rawJson = block;
@@ -658,8 +670,8 @@ preview_excel()
             const parsed = JSON.parse(rawJson);
             if (parsed && parsed.name && parsed.args) {
               toolData = parsed;
-              toolCallMatch = false; // mark as fallback so we know to hide the text
-              break; // Stop at the first valid tool call we successfully parsed
+              toolCallMatch = false;
+              break;
             }
           } catch(e){
             console.warn("Failed parsing repaired JSON block:", e);
@@ -694,9 +706,22 @@ preview_excel()
               for (const file of toolData.args.files) {
                 await fileSystemAPI.writeFile(`workspace/${file.path}`, new TextEncoder().encode(file.content));
                 writtenPaths.push(file.path);
+                await updateFileInIndex(`workspace/${file.path}`);
               }
               result = `Successfully wrote files: ${writtenPaths.join(', ')}`;
               await refreshFiles();
+            } else if (toolData.name === 'edit_file') {
+              const { path, old_content, new_content } = toolData.args;
+              const existing = await fileSystemAPI.readFile(`workspace/${path}`);
+              if (!existing.includes(old_content)) {
+                result = `Error: Could not find the specified old_content in workspace/${path}. The file may have changed. Please re-read it and try again.`;
+              } else {
+                const updated = existing.replace(old_content, new_content);
+                await fileSystemAPI.writeFile(`workspace/${path}`, new TextEncoder().encode(updated));
+                await updateFileInIndex(`workspace/${path}`);
+                result = `Successfully edited workspace/${path}.`;
+                await refreshFiles();
+              }
             } else if (toolData.name === 'run_python') {
               const pyResult = await runPython(toolData.args.code);
               result = `Python output: ${JSON.stringify(pyResult)}`;
