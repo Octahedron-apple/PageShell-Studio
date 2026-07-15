@@ -89,6 +89,19 @@ self.onmessage = async (e) => {
         { role: 'user', content: prompt }
       ];
 
+      if (tools && tools.length > 0) {
+        // Inject tool schema into the system prompt.
+        // IMPORTANT: instruct the model to ONLY use tools when explicitly asked,
+        // never proactively. Regular conversation should never trigger a tool call.
+        const toolsPrompt = `\n\nYou have access to the following tools, but ONLY use them when the user explicitly asks you to create files or run code. For all other questions, answer conversationally with plain text.\n\nAvailable tools:\n${JSON.stringify(tools, null, 2)}\n\nTo invoke a tool, output ONLY a valid JSON object with "name" and "args" keys and nothing else. Do NOT use a tool unless the user's message clearly and directly requests file creation or code execution.`;
+        
+        if (messages[0] && messages[0].role === 'system') {
+          messages[0].content += toolsPrompt;
+        } else {
+          messages.unshift({ role: 'system', content: toolsPrompt });
+        }
+      }
+
       const eng = await getEngine();
 
       if (eng) {
@@ -98,19 +111,6 @@ self.onmessage = async (e) => {
           stream: stream,
           max_tokens: 2048,
         };
-        
-        if (tools && tools.length > 0) {
-          // Inject tool schema into the system prompt.
-          // IMPORTANT: instruct the model to ONLY use tools when explicitly asked,
-          // never proactively. Regular conversation should never trigger a tool call.
-          const toolsPrompt = `\n\nYou have access to the following tools, but ONLY use them when the user explicitly asks you to create files or run code. For all other questions, answer conversationally with plain text.\n\nAvailable tools:\n${JSON.stringify(tools, null, 2)}\n\nTo invoke a tool, output ONLY a valid JSON object with "name" and "args" keys and nothing else. Do NOT use a tool unless the user's message clearly and directly requests file creation or code execution.`;
-          
-          if (messages[0] && messages[0].role === 'system') {
-            messages[0].content += toolsPrompt;
-          } else {
-            messages.unshift({ role: 'system', content: toolsPrompt });
-          }
-        }
 
         const chunks = await eng.chat.completions.create(request);
 

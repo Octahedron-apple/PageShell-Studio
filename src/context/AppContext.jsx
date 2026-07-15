@@ -662,7 +662,15 @@ preview_excel()
           if (tool_calls && tool_calls.length > 0) {
             currentMessages.push({ role: 'assistant', content: fullOutput || null, tool_calls });
           } else {
-            currentMessages.push({ role: 'assistant', content: fullOutput });
+            if (!toolCallMatch && toolData) {
+              const simulatedToolCall = [{
+                 type: 'function',
+                 function: { name: toolData.name, arguments: JSON.stringify(toolData.args) }
+              }];
+              currentMessages.push({ role: 'assistant', content: null, tool_calls: simulatedToolCall });
+            } else {
+              currentMessages.push({ role: 'assistant', content: fullOutput });
+            }
           }
           currentMessages.push({ role: 'user', content: `<tool_response>\n${result}\n</tool_response>` });
           
