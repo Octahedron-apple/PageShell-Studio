@@ -89,10 +89,10 @@ self.onmessage = async (e) => {
         };
         
         if (tools && tools.length > 0) {
-          // WebLLM currently restricts native function calling to Hermes models.
-          // For Qwen2.5, we inject the tool schema into the system prompt and rely on 
-          // the frontend's JSON extraction fallback.
-          const toolsPrompt = `\nYou have access to the following tools:\n${JSON.stringify(tools, null, 2)}\nIf you need to use a tool, you MUST output ONLY a valid JSON object containing "name" and "args" properties, and absolutely no other text.`;
+          // Inject tool schema into the system prompt.
+          // IMPORTANT: instruct the model to ONLY use tools when explicitly asked,
+          // never proactively. Regular conversation should never trigger a tool call.
+          const toolsPrompt = `\n\nYou have access to the following tools, but ONLY use them when the user explicitly asks you to create files or run code. For all other questions, answer conversationally with plain text.\n\nAvailable tools:\n${JSON.stringify(tools, null, 2)}\n\nTo invoke a tool, output ONLY a valid JSON object with "name" and "args" keys and nothing else. Do NOT use a tool unless the user's message clearly and directly requests file creation or code execution.`;
           
           if (messages[0] && messages[0].role === 'system') {
             messages[0].content += toolsPrompt;

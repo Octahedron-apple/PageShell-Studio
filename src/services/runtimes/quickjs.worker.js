@@ -1,10 +1,10 @@
-importScripts(`${import.meta.env.BASE_URL}vendor/quickjs/dist/index.global.js`);
+import { getQuickJS } from 'quickjs-emscripten';
 
 let quickJSPromise = null;
 
 function initQuickJS() {
   if (!quickJSPromise) {
-    quickJSPromise = self.QJS.getQuickJS();
+    quickJSPromise = getQuickJS();
   }
   return quickJSPromise;
 }

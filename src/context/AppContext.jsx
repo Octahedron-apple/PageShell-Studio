@@ -654,6 +654,15 @@ preview_excel()
       }
 
       if (toolData) {
+        // Immediately erase any raw tool-call text that was streamed into the chat
+        setAiLogs(prev => {
+          const next = [...prev];
+          const last = next[next.length - 1];
+          if (last?.sender === 'ai') {
+            next[next.length - 1] = { ...last, text: '' };
+          }
+          return next;
+        });
         setAiLogs(prev => [...prev, { sender: 'ai', pendingTool: toolData }]);
 
         const isAccepted = await new Promise(resolve => {
@@ -682,25 +691,31 @@ preview_excel()
           } catch (err) {
             result = `Error executing tool: ${err.message}`;
           }
-        } else {
-           result = "User denied permission to execute this tool. Ask the user what they would like to do instead.";
-        }
-        
-        currentMessages.push({ role: 'assistant', content: fullOutput });
-        currentMessages.push({ role: 'user', content: `<tool_response>\n${result}\n</tool_response>` });
-        
-        setAiLogs(prev => {
-          const next = [...prev];
-          const last = next[next.length - 1];
-          if (last?.sender === 'ai') {
-            let cleaned = (last.text || '').trim();
-            if (!toolCallMatch && cleaned.startsWith('{') && cleaned.endsWith('}')) {
-              cleaned = '';
-            }
-            next[next.length - 1] = { ...last, text: cleaned };
+
+          if (tool_calls && tool_calls.length > 0) {
+            currentMessages.push({ role: 'assistant', content: fullOutput || null, tool_calls });
+          } else {
+            currentMessages.push({ role: 'assistant', content: fullOutput });
           }
-          return [...next, { sender: 'ai', text: `🔧 Tool Result: ${result}` }];
-        });
+          currentMessages.push({ role: 'user', content: `<tool_response>\n${result}\n</tool_response>` });
+          
+          setAiLogs(prev => {
+            const next = [...prev];
+            const last = next[next.length - 1];
+            if (last?.sender === 'ai') {
+              let cleaned = (last.text || '').trim();
+              if (!toolCallMatch && cleaned.startsWith('{') && cleaned.endsWith('}')) {
+                cleaned = '';
+              }
+              next[next.length - 1] = { ...last, text: cleaned };
+            }
+            return [...next, { sender: 'ai', text: `🔧 Tool Result: ${result}` }];
+          });
+        } else {
+           // User rejected — show a note and stop the loop so they can type
+           setAiLogs(prev => [...prev, { sender: 'ai', text: '❌ Tool call was rejected. You can type your next message.' }]);
+           break;
+        }
       } else {
         break;
       }
