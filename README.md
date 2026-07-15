@@ -1,4 +1,14 @@
-# 🐚 PageShell Studio
+<p align="center">
+  <img src="public/assets/logo.png" alt="PageShell Studio Logo" width="180" />
+</p>
+
+<h1 align="center">PageShell Studio</h1>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" />
+  <img src="https://img.shields.io/badge/version-v0.1.0-blue" alt="version" />
+  <img src="https://img.shields.io/badge/build-passing-brightgreen" alt="Build Status" />
+</p>
 
 > **A fully offline, browser-native AI coding & data assistant** — runs entirely on your device with no backend server, no cloud API calls, and zero data leaving your machine (except optional voice input).
 
@@ -6,8 +16,7 @@
 
 ## 🎥 Demo Video
 
-> _Demo video coming soon — 2–3 minutes showing the problem, the solution, and on-device AI working live._
-
+https://youtu.be/u_0r-c2cTts
 ---
 
 ## ✨ Features
