@@ -8,6 +8,44 @@ import { extractDocxText, extractPdfText } from '../services/ai/rag.js';
 import { exportWorkspaceToZip, importWorkspaceFromZip } from '../utils/zipUtils.js';
 import { buildGlobalIndex, updateFileInIndex, removeFileFromIndex } from '../services/fs/search.js';
 import localforage from 'localforage';
+function extractJSONBlocks(text) {
+  const blocks = [];
+  let braceCount = 0;
+  let startIdx = -1;
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{') {
+        if (braceCount === 0) {
+          startIdx = i;
+        }
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0 && startIdx !== -1) {
+          blocks.push(text.slice(startIdx, i + 1));
+          startIdx = -1;
+        }
+      }
+    }
+  }
+  return blocks;
+}
 
 const AppContext = createContext(null);
 
@@ -606,10 +644,10 @@ preview_excel()
         }
       } else if (typeof fullOutput === 'string') {
         // Fallback string extraction if model outputs raw JSON text instead of native tool_calls
-        const jsonMatch = fullOutput.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
+        const jsonBlocks = extractJSONBlocks(fullOutput);
+        for (const block of jsonBlocks) {
           try {
-            let rawJson = jsonMatch[0];
+            let rawJson = block;
             // Escape literal newlines inside double-quoted strings
             rawJson = rawJson.replace(/"([^"\\]|\\.)*"/g, (m) => 
               m.replace(/\n/g, '\\n').replace(/\r/g, '\\r')
@@ -621,9 +659,10 @@ preview_excel()
             if (parsed && parsed.name && parsed.args) {
               toolData = parsed;
               toolCallMatch = false; // mark as fallback so we know to hide the text
+              break; // Stop at the first valid tool call we successfully parsed
             }
           } catch(e){
-            console.warn("Failed parsing repaired JSON fallback:", e);
+            console.warn("Failed parsing repaired JSON block:", e);
           }
         }
       }
