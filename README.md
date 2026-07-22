@@ -16,7 +16,7 @@
 
 ## 🎥 Demo Video
 
-https://youtu.be/u_0r-c2cTts
+https://youtu.be/
 ---
 
 ## ✨ Features
